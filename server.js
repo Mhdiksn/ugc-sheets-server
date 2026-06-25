@@ -8,6 +8,8 @@
 
 const http = require("http");
 const https = require("https");
+const fs = require("fs");
+const path = require("path");
 const { URL } = require("url");
 
 const PORT = process.env.PORT || 3000;
@@ -44,8 +46,14 @@ function buildCsvUrls(sheetUrl) {
 function fetchUrl(url, depth = 0) {
   return new Promise((resolve, reject) => {
     if (depth > 5) return reject(new Error("too many redirects"));
+    const opts = {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; UGC-Sheets-Proxy/1.0)",
+        Accept: "text/csv,text/plain,*/*",
+      },
+    };
     https
-      .get(url, (res) => {
+      .get(url, opts, (res) => {
         // اتبع التحويل
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           const next = res.headers.location.startsWith("http")
@@ -108,10 +116,23 @@ const server = http.createServer(async (req, res) => {
 
   const reqUrl = new URL(req.url, `http://${req.headers.host}`);
 
-  // صفحة فحص بسيطة — تتأكد إن الخادم شغّال
-  if (reqUrl.pathname === "/" || reqUrl.pathname === "/health") {
+  // فحص الصحة — يتأكد إن الخادم شغّال (يستخدمه التطبيق)
+  if (reqUrl.pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    return res.end(JSON.stringify({ ok: true, service: "ugc-sheets-proxy", time: new Date().toISOString() }));
+    return res.end(JSON.stringify({ ok: true, service: "ugc-app", time: new Date().toISOString() }));
+  }
+
+  // الصفحة الرئيسية — يخدم التطبيق نفسه (index.html)
+  if (reqUrl.pathname === "/" || reqUrl.pathname === "/index.html") {
+    try {
+      const htmlPath = path.join(__dirname, "index.html");
+      const html = fs.readFileSync(htmlPath, "utf8");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      return res.end(html);
+    } catch (e) {
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ ok: true, service: "ugc-app", note: "index.html غير موجود — ارفعه مع الخادم", time: new Date().toISOString() }));
+    }
   }
 
   // المسار الرئيسي: /sheet?url=رابط_الشيت

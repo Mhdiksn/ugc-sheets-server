@@ -1,0 +1,2596 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UGC Iraq — المالية الداخلية</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #FBFAF7; }
+  #root { min-height: 100vh; }
+  #boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; color: #0A4A42; flex-direction: column; gap: 16px; }
+  #boot .mark { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, #0F9E8E 0%, #0A4A42 100%); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+  #boot .spin { width: 28px; height: 28px; border: 3px solid #E1F5F2; border-top-color: #0F9E8E; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
+  @keyframes bootspin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root">
+  <div id="boot">
+    <div class="mark">UGC</div>
+    <div class="spin"></div>
+    <div>يحمّل التطبيق...</div>
+  </div>
+</div>
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+
+// ============================================================================
+// UGC Iraq — لوحة المالية الداخلية
+// نظام موحد لتتبّع: مدفوعات الكريتورز · أرباح الكامبينات والتوزيع · الصرفيات
+// البيانات تُحفظ تلقائياً وتبقى محفوظة حتى بعد إغلاق المتصفح.
+// ============================================================================
+
+const PIN = "2024"; // كلمة سر الادمنز — تكدر تغيرها بأي وقت
+
+// ---- أدوات مساعدة ----------------------------------------------------------
+const fmt = (n) =>
+  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
+    Math.round(Number(n) || 0)
+  );
+
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+const STATUS = {
+  paid: { label: "مدفوع", c: "#1D9E75", bg: "#E1F5EE", t: "#0F6E56" },
+  partial: { label: "جزئي", c: "#BA7517", bg: "#FAEEDA", t: "#854F0B" },
+  unpaid: { label: "باقي", c: "#E24B4A", bg: "#FCEBEB", t: "#A32D2D" },
+};
+
+const PUB_STATUS = {
+  published: { label: "تم النشر", c: "#1D9E75", bg: "#E1F5EE", t: "#0F6E56" },
+  unpublished: { label: "لم يُنشر", c: "#888780", bg: "#F1EFE8", t: "#5F5E5A" },
+};
+
+// تلوين قوائم الحالة حسب القيمة
+function statusSelectStyle(key) {
+  const s = STATUS[key] || STATUS.unpaid;
+  return { background: s.bg, color: s.t, borderColor: s.bg };
+}
+function pubSelectStyle(key) {
+  const s = PUB_STATUS[key] || PUB_STATUS.unpublished;
+  return { background: s.bg, color: s.t, borderColor: s.bg };
+}
+
+// ---- التخزين الدائم --------------------------------------------------------
+const STORE_KEY = "ugc_finance_v1";
+
+async function loadAll() {
+  try {
+    const v = localStorage.getItem(STORE_KEY);
+    if (v) return JSON.parse(v);
+  } catch (e) {
+    /* مفتاح غير موجود بعد — طبيعي بأول استخدام */
+  }
+  return null;
+}
+
+async function saveAll(data) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---- بيانات افتراضية فارغة -------------------------------------------------
+const EMPTY = {
+  creators: [], // {id, name, handle, phone, superKey, campaign, amount, paid, payStatus, pubStatus, pubLink, date, note}
+  campaigns: [], // {id, name, client, revenue, cost, date, splits:[{name, pct}]}
+  expenses: [], // {id, label, amount, type:'company'|'personal', date, note}
+  capital: 0, // رأس مال / رصيد الشركة الابتدائي
+  serverUrl: "", // رابط الخادم الوسيط لقراءة Google Sheets (اختياري)
+};
+
+// ============================================================================
+// المكوّن الرئيسي
+// ============================================================================
+function App() {
+  const [authed, setAuthed] = useState(false);
+  const [pinInput, setPinInput] = useState("");
+  const [pinErr, setPinErr] = useState(false);
+
+  const [data, setData] = useState(EMPTY);
+  const [loaded, setLoaded] = useState(false);
+  const [tab, setTab] = useState("overview");
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
+
+  // تحميل أولي
+  useEffect(() => {
+    (async () => {
+      const d = await loadAll();
+      if (d) setData({ ...EMPTY, ...d });
+      setLoaded(true);
+    })();
+  }, []);
+
+  // حفظ تلقائي عند أي تغيير
+  useEffect(() => {
+    if (!loaded) return;
+    setSaveState("saving");
+    const t = setTimeout(async () => {
+      await saveAll(data);
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1500);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [data, loaded]);
+
+  // ---- حسابات مشتقة --------------------------------------------------------
+  const calc = useMemo(() => {
+    const creatorsDue = data.creators.reduce(
+      (s, c) => s + (Number(c.amount) || 0),
+      0
+    );
+    const creatorsPaid = data.creators.reduce(
+      (s, c) => s + (Number(c.paid) || 0),
+      0
+    );
+    const creatorsOutstanding = creatorsDue - creatorsPaid;
+
+    const revenue = data.campaigns.reduce(
+      (s, c) => s + (Number(c.revenue) || 0),
+      0
+    );
+    const campaignCost = data.campaigns.reduce(
+      (s, c) => s + (Number(c.cost) || 0),
+      0
+    );
+    const grossProfit = revenue - campaignCost;
+
+    const companyExp = data.expenses
+      .filter((e) => e.type === "company")
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const personalExp = data.expenses
+      .filter((e) => e.type === "personal")
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
+    // الرصيد = رأس المال + المدفوع للشركة (الإيراد) - تكاليف الكامبينات - مدفوعات الكريتورز المدفوعة فعلاً - الصرفيات
+    const companyBalance =
+      (Number(data.capital) || 0) +
+      revenue -
+      campaignCost -
+      creatorsPaid -
+      companyExp -
+      personalExp;
+
+    const netProfit = grossProfit - companyExp;
+
+    return {
+      creatorsDue,
+      creatorsPaid,
+      creatorsOutstanding,
+      revenue,
+      campaignCost,
+      grossProfit,
+      companyExp,
+      personalExp,
+      companyBalance,
+      netProfit,
+    };
+  }, [data]);
+
+  // توزيع الأرباح بين الشركاء عبر كل الكامبينات
+  const partnerTotals = useMemo(() => {
+    const map = {};
+    data.campaigns.forEach((c) => {
+      const profit = (Number(c.revenue) || 0) - (Number(c.cost) || 0);
+      (c.splits || []).forEach((s) => {
+        const share = (profit * (Number(s.pct) || 0)) / 100;
+        map[s.name] = (map[s.name] || 0) + share;
+      });
+    });
+    return Object.entries(map)
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [data.campaigns]);
+
+  // ---- مُعدّلات البيانات ---------------------------------------------------
+  const upd = useCallback((fn) => setData((d) => fn(structuredClone(d))), []);
+
+  // ---- شاشة الدخول ---------------------------------------------------------
+  if (!authed) {
+    return (
+      <Shell>
+        <div style={S.lockWrap}>
+          <div style={S.lockCard}>
+            <div style={S.lockIcon}>🔒</div>
+            <h1 style={S.lockTitle}>UGC Iraq — مالية</h1>
+            <p style={S.lockSub}>منطقة الادمنز فقط. أدخل كلمة السر للمتابعة.</p>
+            <input
+              type="password"
+              inputMode="numeric"
+              value={pinInput}
+              onChange={(e) => {
+                setPinInput(e.target.value);
+                setPinErr(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  if (pinInput === PIN) setAuthed(true);
+                  else setPinErr(true);
+                }
+              }}
+              placeholder="••••"
+              style={{ ...S.lockInput, borderColor: pinErr ? "#E24B4A" : "#D3D1C7" }}
+              autoFocus
+            />
+            {pinErr && <div style={S.lockErr}>كلمة السر غلط</div>}
+            <button
+              style={S.lockBtn}
+              onClick={() => {
+                if (pinInput === PIN) setAuthed(true);
+                else setPinErr(true);
+              }}
+            >
+              دخول
+            </button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (!loaded) {
+    return (
+      <Shell>
+        <div style={{ ...S.lockWrap }}>
+          <div style={{ color: "#888780", fontSize: 15 }}>...يحمّل البيانات</div>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ---- الواجهة الرئيسية -----------------------------------------------------
+  const tabs = [
+    { id: "overview", label: "نظرة عامة", icon: "📊" },
+    { id: "creators", label: "مدفوعات الكريتورز", icon: "🎬" },
+    { id: "chat", label: "المساعد الذكي", icon: "🤖" },
+    { id: "campaigns", label: "الكامبينات والأرباح", icon: "📈" },
+    { id: "expenses", label: "الصرفيات", icon: "💸" },
+    { id: "settings", label: "إعدادات", icon: "⚙️" },
+  ];
+
+  return (
+    <Shell>
+      <div style={S.app}>
+        {/* الشريط العلوي */}
+        <header style={S.header}>
+          <div style={S.brand}>
+            <div style={S.brandMark}>UGC</div>
+            <div>
+              <div style={S.brandName}>المالية الداخلية</div>
+              <div style={S.brandSub}>UGC Iraq</div>
+            </div>
+          </div>
+          <div style={S.headerRight}>
+            <SaveBadge state={saveState} />
+            <button style={S.logoutBtn} onClick={() => setAuthed(false)}>
+              قفل
+            </button>
+          </div>
+        </header>
+
+        {/* التبويبات */}
+        <nav style={S.tabBar}>
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                ...S.tab,
+                ...(tab === t.id ? S.tabActive : {}),
+              }}
+            >
+              <span style={{ fontSize: 15 }}>{t.icon}</span>
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        <main style={S.main}>
+          {tab === "overview" && (
+            <Overview calc={calc} partnerTotals={partnerTotals} data={data} />
+          )}
+          {tab === "creators" && (
+            <CreatorsTab data={data} upd={upd} calc={calc} />
+          )}
+          {tab === "chat" && <ChatTab data={data} upd={upd} />}
+          {tab === "campaigns" && (
+            <CampaignsTab data={data} upd={upd} partnerTotals={partnerTotals} />
+          )}
+          {tab === "expenses" && <ExpensesTab data={data} upd={upd} calc={calc} />}
+          {tab === "settings" && (
+            <SettingsTab data={data} setData={setData} upd={upd} />
+          )}
+        </main>
+      </div>
+    </Shell>
+  );
+}
+
+// ============================================================================
+// نظرة عامة
+// ============================================================================
+function Overview({ calc, partnerTotals, data }) {
+  const cards = [
+    {
+      label: "رصيد الشركة الحالي",
+      value: calc.companyBalance,
+      hint: "رأس المال + الإيرادات − كل المصروفات والمدفوعات",
+      big: true,
+      tone: calc.companyBalance >= 0 ? "good" : "bad",
+    },
+    {
+      label: "باقي على الكريتورز",
+      value: calc.creatorsOutstanding,
+      hint: `مدفوع ${fmt(calc.creatorsPaid)} من ${fmt(calc.creatorsDue)}`,
+      tone: calc.creatorsOutstanding > 0 ? "warn" : "good",
+    },
+    {
+      label: "إجمالي الإيرادات",
+      value: calc.revenue,
+      hint: `من ${data.campaigns.length} كامبين`,
+    },
+    {
+      label: "صافي الربح",
+      value: calc.netProfit,
+      hint: "الربح الإجمالي − صرفيات الشركة",
+      tone: calc.netProfit >= 0 ? "good" : "bad",
+    },
+  ];
+
+  return (
+    <div>
+      <SectionTitle>الملخّص المالي</SectionTitle>
+      <div style={S.cardGrid}>
+        {cards.map((c, i) => (
+          <StatCard key={i} {...c} />
+        ))}
+      </div>
+
+      <div style={S.twoCol}>
+        <div style={S.panel}>
+          <div style={S.panelTitle}>توزيع الأرباح على الشركاء</div>
+          {partnerTotals.length === 0 ? (
+            <Empty text="ماكو شركاء بعد. أضف توزيع داخل أي كامبين." />
+          ) : (
+            <div>
+              {partnerTotals.map((p, i) => {
+                const max = Math.max(...partnerTotals.map((x) => Math.abs(x.amount)), 1);
+                const w = (Math.abs(p.amount) / max) * 100;
+                return (
+                  <div key={i} style={S.barRow}>
+                    <div style={S.barLabel}>{p.name}</div>
+                    <div style={S.barTrack}>
+                      <div
+                        style={{
+                          ...S.barFill,
+                          width: `${w}%`,
+                          background: p.amount >= 0 ? "#0F9E8E" : "#E24B4A",
+                        }}
+                      />
+                    </div>
+                    <div style={S.barVal}>{fmt(p.amount)}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={S.panel}>
+          <div style={S.panelTitle}>أين تذهب الأموال</div>
+          <FlowRow label="الإيرادات الداخلة" value={calc.revenue} tone="good" />
+          <FlowRow label="تكاليف الكامبينات" value={-calc.campaignCost} />
+          <FlowRow
+            label="مدفوع للكريتورز فعلاً"
+            value={-calc.creatorsPaid}
+          />
+          <FlowRow label="صرفيات الشركة" value={-calc.companyExp} />
+          <FlowRow label="صرفيات شخصية" value={-calc.personalExp} />
+          <div style={S.flowDivider} />
+          <FlowRow
+            label="الرصيد الناتج"
+            value={calc.companyBalance}
+            bold
+            tone={calc.companyBalance >= 0 ? "good" : "bad"}
+          />
+        </div>
+      </div>
+
+      {calc.creatorsOutstanding > 0 && (
+        <div style={S.alert}>
+          <span style={{ fontSize: 16 }}>⚠️</span>
+          عندك <b>{fmt(calc.creatorsOutstanding)}</b> باقية غير مدفوعة للكريتورز.
+          راجع تبويب «مدفوعات الكريتورز» حتى تشوف المن.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// تبويب مدفوعات الكريتورز
+// ============================================================================
+function CreatorsTab({ data, upd }) {
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const statusOf = (c) => {
+    if (c.payStatus && STATUS[c.payStatus]) return c.payStatus; // اختيار يدوي له الأولوية
+    const a = Number(c.amount) || 0;
+    const p = Number(c.paid) || 0;
+    if (p <= 0) return "unpaid";
+    if (p >= a) return "paid";
+    return "partial";
+  };
+  const pubOf = (c) => (c.pubStatus === "published" ? "published" : "unpublished");
+
+  const q = search.trim().toLowerCase();
+  const list = data.creators.filter((c) => {
+    const ps = statusOf(c);
+    const pub = c.pubStatus === "published";
+    const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
+    let passFilter = true;
+    if (filter === "all") passFilter = true;
+    else if (filter === "published") passFilter = pub;
+    else if (filter === "unpublished") passFilter = !pub;
+    else if (filter === "published_unpaid") passFilter = pub && rem > 0;
+    else passFilter = ps === filter; // paid / partial / unpaid
+    if (!passFilter) return false;
+    if (!q) return true;
+    return (
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.handle || "").toLowerCase().includes(q) ||
+      (c.phone || "").toLowerCase().includes(q) ||
+      (c.superKey || "").toLowerCase().includes(q) ||
+      (c.campaign || "").toLowerCase().includes(q)
+    );
+  });
+
+  const blank = () => ({
+    id: uid(),
+    name: "",
+    handle: "",
+    phone: "",
+    superKey: "",
+    campaign: "",
+    amount: "",
+    paid: "",
+    payStatus: "",
+    pubStatus: "unpublished",
+    pubLink: "",
+    date: todayISO(),
+    note: "",
+  });
+
+  // تغيير سريع للحالة من الجدول
+  const setPayStatus = (id, val) =>
+    upd((d) => {
+      const i = d.creators.findIndex((x) => x.id === id);
+      if (i >= 0) d.creators[i].payStatus = val;
+      return d;
+    });
+  const setPubStatus = (id, val) =>
+    upd((d) => {
+      const i = d.creators.findIndex((x) => x.id === id);
+      if (i >= 0) {
+        d.creators[i].pubStatus = val;
+        if (val === "unpublished") d.creators[i].pubLink = ""; // امسح الرابط إذا رجع غير منشور
+      }
+      return d;
+    });
+
+  const save = (rec) => {
+    upd((d) => {
+      const i = d.creators.findIndex((x) => x.id === rec.id);
+      if (i >= 0) d.creators[i] = rec;
+      else d.creators.unshift(rec);
+      return d;
+    });
+    setEditing(null);
+  };
+
+  const del = (id) =>
+    upd((d) => {
+      d.creators = d.creators.filter((x) => x.id !== id);
+      return d;
+    });
+
+  const markPaid = (c) =>
+    upd((d) => {
+      const i = d.creators.findIndex((x) => x.id === c.id);
+      if (i >= 0) d.creators[i].paid = d.creators[i].amount;
+      return d;
+    });
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>مدفوعات الكريتورز</SectionTitle>
+        <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
+          + كريتور جديد
+        </button>
+      </div>
+
+      <div style={S.searchWrap}>
+        <span style={S.searchIcon}>🔍</span>
+        <input
+          style={S.searchInput}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="دور على كريتور بالاسم، الموبايل، أو السوبر كي..."
+        />
+        {search && (
+          <button style={S.searchClear} onClick={() => setSearch("")}>✕</button>
+        )}
+      </div>
+
+      {q && (
+        <div style={S.lookupBar}>
+          {list.length === 0 ? (
+            <span style={{ color: "#A8A69C" }}>ماكو نتيجة لـ «{search}»</span>
+          ) : (
+            <span style={{ color: "#5F5E5A" }}>
+              <b style={{ color: "#0A4A42" }}>{list.length}</b> نتيجة
+            </span>
+          )}
+        </div>
+      )}
+
+      {q && list.length > 0 && (
+        <div style={S.lookupCards}>
+          {list.slice(0, 8).map((c) => (
+            <div key={c.id} style={S.lookupCard}>
+              <div style={S.lookupName}>{c.name || "—"}</div>
+              {c.handle && <div style={S.lookupHandle}>{c.handle}</div>}
+              <div style={S.lookupRow}>
+                <span style={S.lookupKey}>📱 الموبايل</span>
+                <span style={S.lookupVal}>{c.phone || "—"}</span>
+              </div>
+              <div style={S.lookupRow}>
+                <span style={S.lookupKey}>🔑 السوبر كي</span>
+                <span style={{ ...S.lookupVal, fontWeight: 700, color: "#0A4A42" }}>
+                  {c.superKey || "—"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={S.filterRow}>
+        {[
+          { id: "all", label: "الكل" },
+          { id: "unpaid", label: "باقي" },
+          { id: "partial", label: "جزئي" },
+          { id: "paid", label: "مدفوع" },
+          { id: "published", label: "📹 ناشر" },
+          { id: "unpublished", label: "ما نشر" },
+          { id: "published_unpaid", label: "⭐ نشر وباقي عليه" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            style={{
+              ...S.chip,
+              ...(filter === f.id ? S.chipActive : {}),
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {list.length === 0 ? (
+        <Empty text="ماكو كريتورز بهالفلتر. اضغط «كريتور جديد» حتى تبدي." />
+      ) : (
+        <div style={S.tableWrap}>
+          <table style={S.table}>
+            <thead>
+              <tr>
+                <th style={S.th}>الاسم</th>
+                <th style={S.th}>الموبايل</th>
+                <th style={S.th}>السوبر كي</th>
+                <th style={S.th}>الكامبين</th>
+                <th style={S.thNum}>المستحق</th>
+                <th style={S.thNum}>المدفوع</th>
+                <th style={S.thNum}>الباقي</th>
+                <th style={S.th}>حالة الدفع</th>
+                <th style={S.th}>النشر</th>
+                <th style={S.thAct}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((c) => {
+                const st = statusOf(c);
+                const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
+                return (
+                  <tr key={c.id} style={S.tr}>
+                    <td style={S.td}>
+                      <div style={S.cName}>{c.name || "—"}</div>
+                      {c.handle && <div style={S.cHandle}>{c.handle}</div>}
+                    </td>
+                    <td style={S.tdMono}>{c.phone || "—"}</td>
+                    <td style={S.tdKey}>{c.superKey || "—"}</td>
+                    <td style={S.tdMuted}>{c.campaign || "—"}</td>
+                    <td style={S.tdNum}>{fmt(c.amount)}</td>
+                    <td style={S.tdNum}>{fmt(c.paid)}</td>
+                    <td style={{ ...S.tdNum, color: rem > 0 ? "#A32D2D" : "#888780" }}>
+                      {fmt(rem)}
+                    </td>
+                    <td style={S.td}>
+                      <select
+                        value={st}
+                        onChange={(e) => setPayStatus(c.id, e.target.value)}
+                        style={{ ...S.statusSelect, ...statusSelectStyle(st) }}
+                      >
+                        <option value="paid">مدفوع</option>
+                        <option value="partial">تم الدفع جزئياً</option>
+                        <option value="unpaid">لم يتم الدفع</option>
+                      </select>
+                    </td>
+                    <td style={S.td}>
+                      <div style={S.pubCell}>
+                        <select
+                          value={pubOf(c)}
+                          onChange={(e) => setPubStatus(c.id, e.target.value)}
+                          style={{ ...S.statusSelect, ...pubSelectStyle(pubOf(c)) }}
+                        >
+                          <option value="published">تم نشر الفيديو</option>
+                          <option value="unpublished">لم يتم النشر</option>
+                        </select>
+                        {pubOf(c) === "published" &&
+                          (c.pubLink ? (
+                            <a
+                              href={c.pubLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={S.linkOk}
+                              title={c.pubLink}
+                            >
+                              🔗 الرابط
+                            </a>
+                          ) : (
+                            <button
+                              style={S.linkMissing}
+                              onClick={() => setEditing(c)}
+                              title="أضف رابط النشر"
+                            >
+                              ⚠️ بلا رابط
+                            </button>
+                          ))}
+                      </div>
+                    </td>
+                    <td style={S.tdAct}>
+                      <div style={S.actGroup}>
+                        <button style={S.iconBtn} onClick={() => setEditing(c)}>
+                          ✎
+                        </button>
+                        <button style={S.iconBtnDanger} onClick={() => del(c.id)}>
+                          ✕
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <Modal title={data.creators.find((x) => x.id === editing.id) ? "تعديل كريتور" : "كريتور جديد"} onClose={() => setEditing(null)}>
+          <CreatorForm rec={editing} onSave={save} onCancel={() => setEditing(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function CreatorForm({ rec, onSave, onCancel }) {
+  const [r, setR] = useState(rec);
+  const set = (k, v) => setR((p) => ({ ...p, [k]: v }));
+  return (
+    <div>
+      <Field label="اسم الكريتور">
+        <input style={S.input} value={r.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: سارة محمد" />
+      </Field>
+      <Field label="الحساب / الهاندل">
+        <input style={S.input} value={r.handle} onChange={(e) => set("handle", e.target.value)} placeholder="@username" />
+      </Field>
+      <div style={S.formRow}>
+        <Field label="📱 رقم الموبايل">
+          <input style={S.input} value={r.phone} onChange={(e) => set("phone", e.target.value)} placeholder="07XX XXX XXXX" />
+        </Field>
+        <Field label="🔑 رقم السوبر كي">
+          <input style={S.input} value={r.superKey} onChange={(e) => set("superKey", e.target.value)} placeholder="رقم السوبر كي" />
+        </Field>
+      </div>
+      <Field label="الكامبين">
+        <input style={S.input} value={r.campaign} onChange={(e) => set("campaign", e.target.value)} placeholder="اسم الكامبين أو البراند" />
+      </Field>
+      <div style={S.formRow}>
+        <Field label="المبلغ المستحق">
+          <input style={S.input} type="number" value={r.amount} onChange={(e) => set("amount", e.target.value)} placeholder="0" />
+        </Field>
+        <Field label="المدفوع لحد الآن">
+          <input style={S.input} type="number" value={r.paid} onChange={(e) => set("paid", e.target.value)} placeholder="0" />
+        </Field>
+      </div>
+      <div style={S.formRow}>
+        <Field label="التاريخ">
+          <input style={S.input} type="date" value={r.date} onChange={(e) => set("date", e.target.value)} />
+        </Field>
+      </div>
+
+      <div style={S.formRow}>
+        <Field label="حالة الدفع">
+          <select
+            style={S.input}
+            value={r.payStatus || ""}
+            onChange={(e) => set("payStatus", e.target.value)}
+          >
+            <option value="">تلقائي (حسب المبلغ)</option>
+            <option value="paid">مدفوع</option>
+            <option value="partial">تم الدفع جزئياً</option>
+            <option value="unpaid">لم يتم الدفع</option>
+          </select>
+        </Field>
+        <Field label="حالة النشر">
+          <select
+            style={S.input}
+            value={r.pubStatus === "published" ? "published" : "unpublished"}
+            onChange={(e) => {
+              const v = e.target.value;
+              setR((p) => ({ ...p, pubStatus: v, pubLink: v === "unpublished" ? "" : p.pubLink }));
+            }}
+          >
+            <option value="unpublished">لم يتم نشر الفيديو</option>
+            <option value="published">تم نشر الفيديو</option>
+          </select>
+        </Field>
+      </div>
+
+      {r.pubStatus === "published" && (
+        <Field label="🔗 رابط النشر (مطلوب حتى نعرف إنه ناشر)">
+          <input
+            style={{ ...S.input, direction: "ltr", textAlign: "left" }}
+            value={r.pubLink || ""}
+            onChange={(e) => set("pubLink", e.target.value)}
+            placeholder="https://instagram.com/p/..."
+          />
+        </Field>
+      )}
+
+      <Field label="ملاحظات">
+        <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={r.note} onChange={(e) => set("note", e.target.value)} placeholder="اختياري" />
+      </Field>
+      <FormActions onSave={() => onSave(r)} onCancel={onCancel} />
+    </div>
+  );
+}
+
+// ============================================================================
+// تبويب الكامبينات والأرباح
+// ============================================================================
+function CampaignsTab({ data, upd, partnerTotals }) {
+  const [editing, setEditing] = useState(null);
+
+  const blank = () => ({
+    id: uid(),
+    name: "",
+    client: "",
+    revenue: "",
+    cost: "",
+    date: todayISO(),
+    splits: [],
+  });
+
+  const save = (rec) => {
+    upd((d) => {
+      const i = d.campaigns.findIndex((x) => x.id === rec.id);
+      if (i >= 0) d.campaigns[i] = rec;
+      else d.campaigns.unshift(rec);
+      return d;
+    });
+    setEditing(null);
+  };
+
+  const del = (id) =>
+    upd((d) => {
+      d.campaigns = d.campaigns.filter((x) => x.id !== id);
+      return d;
+    });
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>الكامبينات والأرباح</SectionTitle>
+        <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
+          + كامبين جديد
+        </button>
+      </div>
+
+      {data.campaigns.length === 0 ? (
+        <Empty text="ماكو كامبينات بعد. اضغط «كامبين جديد» حتى تبدي تسجّل الإيرادات والأرباح." />
+      ) : (
+        <div style={S.campList}>
+          {data.campaigns.map((c) => {
+            const rev = Number(c.revenue) || 0;
+            const cost = Number(c.cost) || 0;
+            const profit = rev - cost;
+            const margin = rev > 0 ? (profit / rev) * 100 : 0;
+            return (
+              <div key={c.id} style={S.campCard}>
+                <div style={S.campTop}>
+                  <div>
+                    <div style={S.campName}>{c.name || "كامبين بدون اسم"}</div>
+                    <div style={S.campClient}>{c.client || "—"} · {c.date}</div>
+                  </div>
+                  <div style={S.actGroup}>
+                    <button style={S.iconBtn} onClick={() => setEditing(c)}>✎</button>
+                    <button style={S.iconBtnDanger} onClick={() => del(c.id)}>✕</button>
+                  </div>
+                </div>
+                <div style={S.campStats}>
+                  <MiniStat label="الإيراد" value={rev} />
+                  <MiniStat label="التكلفة" value={cost} />
+                  <MiniStat label="الربح" value={profit} tone={profit >= 0 ? "good" : "bad"} />
+                  <MiniStat label="الهامش" value={`${Math.round(margin)}%`} raw />
+                </div>
+                {c.splits && c.splits.length > 0 && (
+                  <div style={S.splitBox}>
+                    {c.splits.map((s, i) => (
+                      <div key={i} style={S.splitChip}>
+                        <span>{s.name}</span>
+                        <span style={S.splitPct}>{s.pct}%</span>
+                        <span style={S.splitAmt}>{fmt((profit * (Number(s.pct) || 0)) / 100)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {partnerTotals.length > 0 && (
+        <div style={{ ...S.panel, marginTop: 20 }}>
+          <div style={S.panelTitle}>إجمالي حصص الشركاء (كل الكامبينات)</div>
+          {partnerTotals.map((p, i) => (
+            <FlowRow key={i} label={p.name} value={p.amount} tone={p.amount >= 0 ? "good" : "bad"} />
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <Modal title={data.campaigns.find((x) => x.id === editing.id) ? "تعديل كامبين" : "كامبين جديد"} onClose={() => setEditing(null)} wide>
+          <CampaignForm rec={editing} onSave={save} onCancel={() => setEditing(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function CampaignForm({ rec, onSave, onCancel }) {
+  const [r, setR] = useState({ ...rec, splits: rec.splits || [] });
+  const set = (k, v) => setR((p) => ({ ...p, [k]: v }));
+
+  const profit = (Number(r.revenue) || 0) - (Number(r.cost) || 0);
+  const totalPct = r.splits.reduce((s, x) => s + (Number(x.pct) || 0), 0);
+
+  const addSplit = () => setR((p) => ({ ...p, splits: [...p.splits, { name: "", pct: "" }] }));
+  const setSplit = (i, k, v) =>
+    setR((p) => {
+      const sp = [...p.splits];
+      sp[i] = { ...sp[i], [k]: v };
+      return { ...p, splits: sp };
+    });
+  const delSplit = (i) => setR((p) => ({ ...p, splits: p.splits.filter((_, j) => j !== i) }));
+
+  return (
+    <div>
+      <div style={S.formRow}>
+        <Field label="اسم الكامبين">
+          <input style={S.input} value={r.name} onChange={(e) => set("name", e.target.value)} placeholder="مثال: حملة رمضان" />
+        </Field>
+        <Field label="البراند / العميل">
+          <input style={S.input} value={r.client} onChange={(e) => set("client", e.target.value)} placeholder="اسم العميل" />
+        </Field>
+      </div>
+      <div style={S.formRow}>
+        <Field label="الإيراد (اللي دفعه العميل)">
+          <input style={S.input} type="number" value={r.revenue} onChange={(e) => set("revenue", e.target.value)} placeholder="0" />
+        </Field>
+        <Field label="التكلفة (كريتورز + إنتاج)">
+          <input style={S.input} type="number" value={r.cost} onChange={(e) => set("cost", e.target.value)} placeholder="0" />
+        </Field>
+      </div>
+      <div style={S.formRow}>
+        <Field label="التاريخ">
+          <input style={S.input} type="date" value={r.date} onChange={(e) => set("date", e.target.value)} />
+        </Field>
+      </div>
+
+      <div style={S.profitBanner}>
+        <span>الربح الصافي لهالكامبين</span>
+        <b style={{ color: profit >= 0 ? "#0F6E56" : "#A32D2D" }}>{fmt(profit)}</b>
+      </div>
+
+      <div style={S.splitHeader}>
+        <span style={S.fieldLabel}>توزيع الأرباح بين الشركاء</span>
+        <button style={S.smallBtn} onClick={addSplit}>+ شريك</button>
+      </div>
+      {r.splits.length === 0 && (
+        <div style={S.splitHint}>ماكو توزيع. أضف الشركاء ونسبة كل واحد (مثال: 50% و 50%).</div>
+      )}
+      {r.splits.map((s, i) => (
+        <div key={i} style={S.splitRow}>
+          <input style={{ ...S.input, flex: 2 }} value={s.name} onChange={(e) => setSplit(i, "name", e.target.value)} placeholder="اسم الشريك" />
+          <input style={{ ...S.input, flex: 1 }} type="number" value={s.pct} onChange={(e) => setSplit(i, "pct", e.target.value)} placeholder="%" />
+          <div style={S.splitCalc}>{fmt((profit * (Number(s.pct) || 0)) / 100)}</div>
+          <button style={S.iconBtnDanger} onClick={() => delSplit(i)}>✕</button>
+        </div>
+      ))}
+      {r.splits.length > 0 && (
+        <div style={{ ...S.splitTotal, color: totalPct === 100 ? "#0F6E56" : "#BA7517" }}>
+          مجموع النسب: {totalPct}% {totalPct !== 100 && "(لازم يصير 100%)"}
+        </div>
+      )}
+
+      <FormActions onSave={() => onSave(r)} onCancel={onCancel} />
+    </div>
+  );
+}
+
+// ============================================================================
+// تبويب الصرفيات
+// ============================================================================
+function ExpensesTab({ data, upd, calc }) {
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter] = useState("all");
+
+  const blank = () => ({
+    id: uid(),
+    label: "",
+    amount: "",
+    type: "company",
+    date: todayISO(),
+    note: "",
+  });
+
+  const list = data.expenses.filter((e) =>
+    filter === "all" ? true : e.type === filter
+  );
+
+  const save = (rec) => {
+    upd((d) => {
+      const i = d.expenses.findIndex((x) => x.id === rec.id);
+      if (i >= 0) d.expenses[i] = rec;
+      else d.expenses.unshift(rec);
+      return d;
+    });
+    setEditing(null);
+  };
+
+  const del = (id) =>
+    upd((d) => {
+      d.expenses = d.expenses.filter((x) => x.id !== id);
+      return d;
+    });
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>الصرفيات</SectionTitle>
+        <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
+          + صرفية جديدة
+        </button>
+      </div>
+
+      <div style={S.cardGrid}>
+        <StatCard label="صرفيات الشركة" value={calc.companyExp} tone="warn" />
+        <StatCard label="صرفيات شخصية" value={calc.personalExp} tone="warn" />
+      </div>
+
+      <div style={S.filterRow}>
+        {[
+          { id: "all", label: "الكل" },
+          { id: "company", label: "شركة" },
+          { id: "personal", label: "شخصي" },
+        ].map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setFilter(f.id)}
+            style={{ ...S.chip, ...(filter === f.id ? S.chipActive : {}) }}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {list.length === 0 ? (
+        <Empty text="ماكو صرفيات بهالفلتر." />
+      ) : (
+        <div style={S.tableWrap}>
+          <table style={S.table}>
+            <thead>
+              <tr>
+                <th style={S.th}>البيان</th>
+                <th style={S.th}>النوع</th>
+                <th style={S.th}>التاريخ</th>
+                <th style={S.thNum}>المبلغ</th>
+                <th style={S.thAct}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((e) => (
+                <tr key={e.id} style={S.tr}>
+                  <td style={S.td}>
+                    <div style={S.cName}>{e.label || "—"}</div>
+                    {e.note && <div style={S.cHandle}>{e.note}</div>}
+                  </td>
+                  <td style={S.td}>
+                    <span style={{ ...S.typePill, ...(e.type === "company" ? S.typeCompany : S.typePersonal) }}>
+                      {e.type === "company" ? "شركة" : "شخصي"}
+                    </span>
+                  </td>
+                  <td style={S.tdMuted}>{e.date}</td>
+                  <td style={{ ...S.tdNum, color: "#A32D2D" }}>−{fmt(e.amount)}</td>
+                  <td style={S.tdAct}>
+                    <div style={S.actGroup}>
+                      <button style={S.iconBtn} onClick={() => setEditing(e)}>✎</button>
+                      <button style={S.iconBtnDanger} onClick={() => del(e.id)}>✕</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <Modal title={data.expenses.find((x) => x.id === editing.id) ? "تعديل صرفية" : "صرفية جديدة"} onClose={() => setEditing(null)}>
+          <ExpenseForm rec={editing} onSave={save} onCancel={() => setEditing(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function ExpenseForm({ rec, onSave, onCancel }) {
+  const [r, setR] = useState(rec);
+  const set = (k, v) => setR((p) => ({ ...p, [k]: v }));
+  return (
+    <div>
+      <Field label="البيان">
+        <input style={S.input} value={r.label} onChange={(e) => set("label", e.target.value)} placeholder="مثال: إعلانات إنستغرام" />
+      </Field>
+      <div style={S.formRow}>
+        <Field label="المبلغ">
+          <input style={S.input} type="number" value={r.amount} onChange={(e) => set("amount", e.target.value)} placeholder="0" />
+        </Field>
+        <Field label="النوع">
+          <select style={S.input} value={r.type} onChange={(e) => set("type", e.target.value)}>
+            <option value="company">شركة</option>
+            <option value="personal">شخصي</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="التاريخ">
+        <input style={S.input} type="date" value={r.date} onChange={(e) => set("date", e.target.value)} />
+      </Field>
+      <Field label="ملاحظات">
+        <textarea style={{ ...S.input, minHeight: 60, resize: "vertical" }} value={r.note} onChange={(e) => set("note", e.target.value)} placeholder="اختياري" />
+      </Field>
+      <FormActions onSave={() => onSave(r)} onCancel={onCancel} />
+    </div>
+  );
+}
+
+// ============================================================================
+// تبويب المساعد الذكي — يقرا سكرين شوت التحويل ويسجّل الدفعة
+// ============================================================================
+function ChatTab({ data, upd }) {
+  const [messages, setMessages] = useState([
+    {
+      role: "ai",
+      type: "text",
+      text:
+        "هلا! آني مساعدك الذكي لكل شي بالتطبيق. تكدر تحجي وياي عادي وآني أسوي:\n\n• أضيف كريتور جديد وأملّي بياناته (روابط، أرقام، سوبر كي، سعر) من كلامك\n• أعدّل أي كريتور أو كامبين أو صرفية موجودة\n• أسجّل دفعات — تكتبلي أو تلصق سكرين شوت التحويل من Super Qi\n• أقرا شيت كامبين من رابط Google Sheets منشور، أحسب التكلفة من المعتمدين بس، وأضيفها للصرفيات والكريتورز تلقائياً\n• أجاوبك: «شكد الباقي على سارة؟» «منو ماخذ فلوس؟» «شكد ربحت هالشهر؟»\n\nجرّب: دزلي رابط شيت كامبين منشور، أو گلي «أضف كريتور اسمه أحمد سوبر كي 12345 سعره 50 ألف»، أو الصق صورة تحويل.",
+    },
+  ]);
+  const [busy, setBusy] = useState(false);
+  const [textInput, setTextInput] = useState("");
+  const [pendingImg, setPendingImg] = useState(null);
+  const [pendingCsv, setPendingCsv] = useState(null); // {name, text} ملف CSV مرفوع
+  const [publishReminder, setPublishReminder] = useState(null); // {url} بعد معالجة شيت — تذكير بإغلاق النشر
+  const scrollRef = React.useRef(null);
+  const fileRef = React.useRef(null);
+  const taRef = React.useRef(null);
+  const apiHistoryRef = React.useRef([]);
+
+  React.useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, busy]);
+
+  const addMsg = (m) => setMessages((p) => [...p, m]);
+
+  React.useEffect(() => {
+    const onPaste = async (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const it of items) {
+        if (it.type.startsWith("image/")) {
+          const file = it.getAsFile();
+          if (file) {
+            e.preventDefault();
+            await attachImage(file);
+          }
+          return;
+        }
+      }
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
+  const fileToParts = (file) =>
+    new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () =>
+        res({ dataUrl: r.result, b64: r.result.split(",")[1], mediaType: file.type || "image/png" });
+      r.onerror = () => rej(new Error("read failed"));
+      r.readAsDataURL(file);
+    });
+
+  const attachImage = async (file) => {
+    const parts = await fileToParts(file);
+    setPendingImg(parts);
+  };
+
+  // يميّز نوع الملف: صورة أو CSV/نص
+  const attachFile = async (file) => {
+    const isImage = (file.type || "").startsWith("image/");
+    const name = (file.name || "").toLowerCase();
+    const isCsv =
+      name.endsWith(".csv") ||
+      name.endsWith(".tsv") ||
+      name.endsWith(".txt") ||
+      file.type === "text/csv" ||
+      file.type === "text/plain";
+    if (isImage) {
+      await attachImage(file);
+    } else if (isCsv) {
+      const text = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error("read failed"));
+        r.readAsText(file);
+      });
+      setPendingCsv({ name: file.name || "ملف", text });
+    } else {
+      // غير مدعوم — جرّب نقراه كصورة
+      await attachImage(file);
+    }
+  };
+
+  const tools = [
+    {
+      name: "add_creator",
+      description:
+        "أضف كريتور جديد لقاعدة البيانات. استخدمها لمن المستخدم يريد يضيف كريتور أو أكثر بأي معلومات يعطيها (اسم، رقم سوبر كي، موبايل، حساب/رابط، سعر/مبلغ مستحق، كامبين).",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "اسم الكريتور" },
+          handle: { type: "string", description: "الحساب أو الرابط" },
+          phone: { type: "string", description: "رقم الموبايل" },
+          superKey: { type: "string", description: "رقم السوبر كي" },
+          amount: { type: "number", description: "المبلغ المستحق / السعر" },
+          paid: { type: "number", description: "المدفوع لحد الآن، إذا ماكو خليه 0" },
+          campaign: { type: "string", description: "اسم الكامبين أو البراند" },
+          pubStatus: { type: "string", enum: ["published", "unpublished"], description: "حالة نشر الفيديو" },
+          pubLink: { type: "string", description: "رابط النشر، مطلوب إذا pubStatus=published" },
+          payStatus: { type: "string", enum: ["paid", "partial", "unpaid"], description: "حالة الدفع يدوياً، اختياري (الافتراضي يتحسب من المبلغ)" },
+          note: { type: "string", description: "أي ملاحظة" },
+        },
+        required: ["name"],
+      },
+    },
+    {
+      name: "update_creator",
+      description: "عدّل بيانات كريتور موجود. لازم تحدد creatorId. عدّل بس الحقول المذكورة.",
+      input_schema: {
+        type: "object",
+        properties: {
+          creatorId: { type: "string", description: "id الكريتور المراد تعديله" },
+          name: { type: "string" },
+          handle: { type: "string" },
+          phone: { type: "string" },
+          superKey: { type: "string" },
+          amount: { type: "number" },
+          paid: { type: "number" },
+          campaign: { type: "string" },
+          pubStatus: { type: "string", enum: ["published", "unpublished"] },
+          pubLink: { type: "string", description: "رابط النشر" },
+          payStatus: { type: "string", enum: ["paid", "partial", "unpaid"] },
+          note: { type: "string" },
+        },
+        required: ["creatorId"],
+      },
+    },
+    {
+      name: "record_payment",
+      description:
+        "سجّل دفعة لكريتور (تنضاف لخانة المدفوع). استخدمها لمن المستخدم يگول دفع لكريتور، أو لمن تقرا سكرين شوت تحويل وتتعرف على الكريتور من السوبر كي.",
+      input_schema: {
+        type: "object",
+        properties: {
+          creatorId: { type: "string", description: "id الكريتور" },
+          amount: { type: "number", description: "مبلغ الدفعة" },
+          date: { type: "string", description: "تاريخ الدفعة YYYY-MM-DD، إذا ماكو خليه فارغ" },
+        },
+        required: ["creatorId", "amount"],
+      },
+    },
+    {
+      name: "delete_creator",
+      description: "احذف كريتور نهائياً. بحذر وبس لمن المستخدم يطلب الحذف صراحة.",
+      input_schema: {
+        type: "object",
+        properties: { creatorId: { type: "string" } },
+        required: ["creatorId"],
+      },
+    },
+    {
+      name: "add_campaign",
+      description: "أضف كامبين جديد بإيراد وتكلفة وتوزيع أرباح اختياري.",
+      input_schema: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "اسم الكامبين" },
+          client: { type: "string", description: "البراند أو العميل" },
+          revenue: { type: "number", description: "الإيراد" },
+          cost: { type: "number", description: "التكلفة الكلية" },
+          date: { type: "string", description: "YYYY-MM-DD" },
+          splits: {
+            type: "array",
+            description: "توزيع الأرباح، كل عنصر فيه name و pct",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" }, pct: { type: "number" } },
+            },
+          },
+        },
+        required: ["name"],
+      },
+    },
+    {
+      name: "add_expense",
+      description: "أضف صرفية. النوع إما 'company' أو 'personal'.",
+      input_schema: {
+        type: "object",
+        properties: {
+          label: { type: "string", description: "بيان الصرفية" },
+          amount: { type: "number" },
+          type: { type: "string", enum: ["company", "personal"] },
+          date: { type: "string", description: "YYYY-MM-DD" },
+          note: { type: "string" },
+        },
+        required: ["label", "amount"],
+      },
+    },
+  ];
+
+  const runTool = (name, input) => {
+    let result = "";
+    if (name === "add_creator") {
+      const pub = input.pubStatus === "published" ? "published" : "unpublished";
+      const rec = {
+        id: uid(),
+        name: input.name || "",
+        handle: input.handle || "",
+        phone: input.phone || "",
+        superKey: input.superKey || "",
+        campaign: input.campaign || "",
+        amount: input.amount != null ? Number(input.amount) : "",
+        paid: input.paid != null ? Number(input.paid) : "",
+        payStatus: input.payStatus || "",
+        pubStatus: pub,
+        pubLink: pub === "published" ? input.pubLink || "" : "",
+        date: todayISO(),
+        note: input.note || "",
+      };
+      upd((d) => {
+        d.creators.unshift(rec);
+        return d;
+      });
+      result = `تمت إضافة الكريتور "${rec.name}" بنجاح (id: ${rec.id}).`;
+    } else if (name === "update_creator") {
+      let found = null;
+      upd((d) => {
+        const i = d.creators.findIndex((x) => x.id === input.creatorId);
+        if (i >= 0) {
+          ["name", "handle", "phone", "superKey", "campaign", "note", "payStatus", "pubStatus", "pubLink"].forEach((k) => {
+            if (input[k] !== undefined) d.creators[i][k] = input[k];
+          });
+          ["amount", "paid"].forEach((k) => {
+            if (input[k] !== undefined) d.creators[i][k] = Number(input[k]);
+          });
+          if (d.creators[i].pubStatus === "unpublished") d.creators[i].pubLink = "";
+          found = d.creators[i].name;
+        }
+        return d;
+      });
+      result = found ? `تم تعديل بيانات "${found}".` : `ما لگيت كريتور بهذا الـid.`;
+    } else if (name === "record_payment") {
+      let info = null;
+      upd((d) => {
+        const i = d.creators.findIndex((x) => x.id === input.creatorId);
+        if (i >= 0) {
+          const cur = Number(d.creators[i].paid) || 0;
+          const amt = Number(input.amount) || 0;
+          d.creators[i].paid = cur + amt;
+          const dt = input.date || todayISO();
+          const note = d.creators[i].note || "";
+          d.creators[i].note = `${note}${note ? " · " : ""}دفعة ${fmt(amt)} بتاريخ ${dt}`.trim();
+          const total = Number(d.creators[i].amount) || 0;
+          info = { name: d.creators[i].name, paid: cur + amt, total, rem: total - (cur + amt) };
+        }
+        return d;
+      });
+      result = info
+        ? `تم تسجيل دفعة ${fmt(input.amount)} لـ "${info.name}". المدفوع صار ${fmt(info.paid)}${info.total ? ` من ${fmt(info.total)} (باقي ${fmt(info.rem)})` : ""}.`
+        : `ما لگيت كريتور بهذا الـid.`;
+    } else if (name === "delete_creator") {
+      let nm = null;
+      upd((d) => {
+        const c = d.creators.find((x) => x.id === input.creatorId);
+        nm = c ? c.name : null;
+        d.creators = d.creators.filter((x) => x.id !== input.creatorId);
+        return d;
+      });
+      result = nm ? `تم حذف الكريتور "${nm}".` : `ما لگيت كريتور بهذا الـid.`;
+    } else if (name === "add_campaign") {
+      const rec = {
+        id: uid(),
+        name: input.name || "",
+        client: input.client || "",
+        revenue: input.revenue != null ? Number(input.revenue) : "",
+        cost: input.cost != null ? Number(input.cost) : "",
+        date: input.date || todayISO(),
+        splits: Array.isArray(input.splits)
+          ? input.splits.map((s) => ({ name: s.name || "", pct: Number(s.pct) || 0 }))
+          : [],
+      };
+      upd((d) => {
+        d.campaigns.unshift(rec);
+        return d;
+      });
+      result = `تمت إضافة كامبين "${rec.name}".`;
+    } else if (name === "add_expense") {
+      const rec = {
+        id: uid(),
+        label: input.label || "",
+        amount: Number(input.amount) || 0,
+        type: input.type === "personal" ? "personal" : "company",
+        date: input.date || todayISO(),
+        note: input.note || "",
+      };
+      upd((d) => {
+        d.expenses.unshift(rec);
+        return d;
+      });
+      result = `تمت إضافة صرفية "${rec.label}" بمبلغ ${fmt(rec.amount)} (${rec.type === "personal" ? "شخصي" : "شركة"}).`;
+    } else {
+      result = "أداة غير معروفة.";
+    }
+    return result;
+  };
+
+  const buildContext = () => {
+    const creators = data.creators.map((c) => ({
+      id: c.id,
+      name: c.name,
+      handle: c.handle,
+      phone: c.phone,
+      superKey: c.superKey,
+      campaign: c.campaign,
+      amount: Number(c.amount) || 0,
+      paid: Number(c.paid) || 0,
+      remaining: (Number(c.amount) || 0) - (Number(c.paid) || 0),
+      published: c.pubStatus === "published",
+      pubLink: c.pubLink || "",
+      payStatus: c.payStatus || "",
+    }));
+    const campaigns = data.campaigns.map((c) => ({
+      id: c.id,
+      name: c.name,
+      client: c.client,
+      revenue: Number(c.revenue) || 0,
+      cost: Number(c.cost) || 0,
+      profit: (Number(c.revenue) || 0) - (Number(c.cost) || 0),
+      splits: c.splits,
+    }));
+    const expenses = data.expenses.map((e) => ({
+      id: e.id,
+      label: e.label,
+      amount: Number(e.amount) || 0,
+      type: e.type,
+      date: e.date,
+    }));
+    const totalDue = creators.reduce((s, c) => s + c.amount, 0);
+    const totalPaid = creators.reduce((s, c) => s + c.paid, 0);
+    return {
+      today: todayISO(),
+      capital: Number(data.capital) || 0,
+      creators,
+      campaigns,
+      expenses,
+      summary: { creatorsCount: creators.length, totalDue, totalPaid, totalOutstanding: totalDue - totalPaid },
+    };
+  };
+
+  const SYSTEM = () => `أنت "المساعد الذكي" داخل تطبيق مالية UGC Iraq (وكالة UGC عراقية). تحجي بالعربي العراقي الودّي ومختصر.
+
+دورك: تساعد المستخدم بكل شي داخل التطبيق عبر المحادثة. عندك أدوات تنفّذ تعديلات حقيقية على البيانات (إضافة/تعديل/حذف كريتور، تسجيل دفعة، إضافة كامبين، إضافة صرفية). لمن المستخدم يطلب شي يحتاج تعديل بيانات، استخدم الأداة المناسبة — لا تكتفي بالكلام.
+
+تقدر تقرا سكرين شوت تحويل من تطبيق Super Qi (كي كارد) عراقي. لمن المستخدم يلصق صورة تحويل:
+1. اقرا المبلغ ورقم السوبر كي المستلِم من الصورة.
+2. طابق رقم السوبر كي مع superKey بقائمة الكريتورز اللي بالسياق.
+3. إذا لگيت تطابق واضح والمبلغ واضح — استخدم أداة record_payment طول.
+4. إذا الرقم مو واضح، أو ماكو تطابق، أو أكثر من تطابق، أو المبلغ غريب — لا تسجّل، اسأل المستخدم أول ووضّح المشكلة.
+
+لمن تجاوب عن أسئلة (شكد الباقي، منو ماخذ، شكد الربح) — استخدم البيانات بالسياق مباشرة بدون أدوات. خلي جوابك دقيق بالأرقام.
+
+لمن المستخدم يعطيك معلومات كريتور (روابط، أرقام، أسعار) حتى لو دفعة وحدة لكذا كريتور — أضفهم كلهم باستخدام add_creator (أداة لكل كريتور).
+
+البيانات الحالية للتطبيق (JSON):
+${JSON.stringify(buildContext())}
+
+ملاحظات: العملة دينار عراقي. "السعر" أو "المبلغ" للكريتور = amount (المستحق). لا تخترع أرقام؛ إذا ناقصة معلومة مهمة اسأل عنها.
+
+حالة النشر: كل كريتور عنده published (true/false) و pubLink (رابط النشر). القاعدة المهمة: ما ندفع للكريتور إلا إذا نشر الفيديو وعنده رابط نشر. إذا المستخدم يسأل "منو ناشر؟" أو "منو نشر وما اندفعله؟" استخدم البيانات: published=true و remaining>0. إذا المستخدم يگول إن كريتور نشر، استخدم update_creator وحدد pubStatus=published، وإذا عطاك الرابط حطه بـpubLink. إذا گال نشر بدون رابط، ذكّره يحط الرابط.
+
+== معالجة شيت كامبين (مهم جداً) ==
+لمن يجيك بالرسالة "بيانات الشيت المقروءة تلقائياً بصيغة CSV"، هاي بيانات كامبين كاملة من Google Sheet. سوي التالي بالترتيب:
+
+1. تعرّف على اسم الكامبين: دوّر بأعلى الشيت أو بالعنوان أو من سياق كلام المستخدم. إذا ما واضح، اسأل المستخدم شنو اسم الكامبين.
+
+2. افهم الأعمدة: الشيت عادة فيه أعمدة مثل: الاسم (Name)، الرابط (Link)، التكلفة/السعر (cost)، حالة الاتفاق (Aggrement/Agreement: Approved أو Rejected)، حالة الفيديو (Video Status: Requested/Done)، حالة الدفع (Status: Payed/فاضي). الأعمدة ممكن تكون بالعربي أو الإنكليزي.
+
+3. احسب التكلفة من المعتمدين بس: اجمع cost لكل كريتور حالة اتفاقه = Approved فقط. تجاهل أي صف حالته Rejected تماماً — لا تحسبه ولا تضيفه. لاحظ التكلفة ممكن تكون بالدولار ($) أو الدينار — انتبه للعملة وبيّنها.
+
+4. سوي الثنين معاً:
+   أ) أضف صرفية إجمالية للكامبين باستخدام add_expense: label = "تكلفة كامبين [الاسم] - [عدد] كريتور معتمد"، amount = مجموع تكاليف المعتمدين، type = "company". هاي تمثّل المبلغ اللي المفروض تصرفه بالفترة الجاية.
+   ب) أضف كل كريتور معتمد كصف منفصل باستخدام add_creator: name من الشيت، handle = الرابط، amount = سعره، campaign = اسم الكامبين، وحالة الدفع: إذا الشيت يبيّن Payed خلي payStatus="paid" و paid = amount، وإلا payStatus="unpaid". إذا حالة الفيديو Done خلي pubStatus="published".
+
+5. بعد ما تخلص، اعطِ المستخدم ملخّص: اسم الكامبين، عدد المعتمدين، عدد المرفوضين (المتجاهَلين)، والتكلفة الكلية.
+
+ملاحظة: لا تضيف الكريتورز المرفوضين أبداً. إذا نفس الكريتور موجود من قبل بالقائمة (نفس الاسم)، لا تكرره — بس نبّه المستخدم.
+
+تحديث الدفع لاحقاً: المستخدم راح يحدّث الشيت بنفسه ويعطي Payed، وبعدين ممكن يعيد إرسال الرابط أو يگلك "حدّث دفعات كامبين [الاسم]" — وقتها قارن وحدّث حالات الدفع.`;
+
+  // ---- قراءة Google Sheets المنشور ---------------------------------------
+  // يستخرج معرّف الشيت و gid من أي رابط، ويبني رابط CSV قابل للقراءة من المتصفح
+  // يرجّع قائمة روابط CSV مرشّحة نجرّبها بالترتيب (لأن بعض الصيغ تنحجب بالـCORS)
+  const parseSheetUrls = (url) => {
+    const candidates = [];
+    try {
+      const gidM = url.match(/[#&?]gid=([0-9]+)/);
+      const gid = gidM ? gidM[1] : null;
+
+      // صيغة النشر للعامة: /spreadsheets/d/e/2PACX-.../pubhtml أو /pub
+      const pm = url.match(/\/spreadsheets\/d\/e\/([a-zA-Z0-9-_]+)/);
+      if (pm && pm[1]) {
+        const id = pm[1];
+        candidates.push(`https://docs.google.com/spreadsheets/d/e/${id}/pub?output=csv${gid ? `&gid=${gid}` : ""}`);
+        candidates.push(`https://docs.google.com/spreadsheets/d/e/${id}/pub?single=true&output=csv${gid ? `&gid=${gid}` : ""}`);
+        return candidates;
+      }
+
+      // الصيغة العادية: /spreadsheets/d/SHEET_ID/edit#gid=GID
+      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (m && m[1]) {
+        const id = m[1];
+        candidates.push(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv${gid ? `&gid=${gid}` : ""}`);
+        candidates.push(`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv${gid ? `&gid=${gid}` : ""}`);
+        return candidates;
+      }
+    } catch (e) {}
+    return candidates;
+  };
+
+  const detectSheetUrl = (txt) => {
+    const m = txt.match(/https?:\/\/docs\.google\.com\/spreadsheets\/[^\s]+/);
+    return m ? m[0] : null;
+  };
+
+  // يجرّب كل رابط مرشّح لحد ما يلگي CSV صحيح (قراءة مباشرة من المتصفح)
+  const fetchSheetCsv = async (urls) => {
+    let lastErr = "fetch_failed";
+    for (const u of urls) {
+      try {
+        const resp = await fetch(u);
+        if (!resp.ok) {
+          lastErr = "fetch_failed";
+          continue;
+        }
+        const text = await resp.text();
+        // إذا رجع HTML بدل CSV معناها الشيت مو منشور أو الصيغة غلط
+        if (text.trim().startsWith("<") || text.includes("<!DOCTYPE") || text.includes("<html")) {
+          lastErr = "not_published";
+          continue;
+        }
+        if (text.trim().length === 0) {
+          lastErr = "fetch_failed";
+          continue;
+        }
+        return text; // نجح
+      } catch (e) {
+        lastErr = "fetch_failed";
+      }
+    }
+    throw new Error(lastErr);
+  };
+
+  // قراءة الشيت عبر الخادم الوسيط (يتجاوز حجب CORS تماماً)
+  // طلب مع مهلة زمنية (timeout) — يتجنب التعليق للأبد
+  const fetchWithTimeout = async (url, ms) => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const resp = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(t);
+      return resp;
+    } catch (e) {
+      clearTimeout(t);
+      throw e;
+    }
+  };
+
+  const fetchViaServer = async (serverUrl, sheetUrl, onWake) => {
+    const base = serverUrl.replace(/\/+$/, ""); // شيل أي / زايدة بالنهاية
+    const endpoint = `${base}/sheet?url=${encodeURIComponent(sheetUrl)}`;
+
+    // الخادم المجاني ممكن يكون نايم — نجرّب عدة مرات وننتظر بينها (cold start)
+    let lastErr = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const resp = await fetchWithTimeout(endpoint, 60000); // مهلة دقيقة (الخادم يصحى)
+        const text = await resp.text();
+        if (!resp.ok) {
+          try {
+            const j = JSON.parse(text);
+            throw new Error(j.error || "fetch_failed");
+          } catch (e) {
+            throw new Error(e.message || "fetch_failed");
+          }
+        }
+        if (text.trim().startsWith("<") || text.includes("<html") || text.trim().length === 0) {
+          throw new Error("not_published");
+        }
+        return text; // نجح
+      } catch (e) {
+        lastErr = e;
+        // أخطاء واضحة ما نعيدها
+        if (e.message === "not_published" || e.message === "bad_url") throw e;
+        // خطأ شبكة أو timeout — يمكن الخادم نايم، ننتظر ونعيد
+        if (attempt === 0 && onWake) onWake();
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+    throw lastErr || new Error("fetch_failed");
+  };
+
+  const send = async () => {
+    if (busy) return;
+    const txt = textInput.trim();
+    if (!txt && !pendingImg && !pendingCsv) return;
+
+    if (pendingImg) addMsg({ role: "user", type: "image", src: pendingImg.dataUrl, caption: txt });
+    else if (pendingCsv) addMsg({ role: "user", type: "file", name: pendingCsv.name, caption: txt });
+    else if (txt) addMsg({ role: "user", type: "text", text: txt });
+
+    // كشف رابط Google Sheets ومحاولة قراءته
+    let sheetCsv = null;
+    let sheetError = null;
+    const sheetUrl = txt ? detectSheetUrl(txt) : null;
+    if (sheetUrl) {
+      addMsg({ role: "ai", type: "action", text: "أقرا بيانات الشيت..." });
+      setBusy(true);
+      // إذا الخادم الوسيط مضبوط استخدمه، وإلا جرّب نفس الموقع (relative) لأن التطبيق منشور مع الخادم
+      let serverBase = (data.serverUrl || "").trim();
+      if (!serverBase && typeof window !== "undefined" && window.location && window.location.origin.startsWith("http")) {
+        serverBase = window.location.origin; // التطبيق منشور على نفس خادم الـ proxy
+      }
+      if (serverBase) {
+        try {
+          sheetCsv = await fetchViaServer(serverBase, sheetUrl, () => {
+            addMsg({ role: "ai", type: "action", text: "الخادم يصحى من النوم... (ممكن ياخذ نص دقيقة أول مرة)" });
+          });
+        } catch (e) {
+          sheetError = e.message === "not_published" ? "not_published" : e.message === "bad_url" ? "bad_url" : "fetch_failed";
+        }
+      }
+      // إذا ماكو خادم أو فشل، جرّب القراءة المباشرة من المتصفح
+      if (!sheetCsv) {
+        const csvUrls = parseSheetUrls(sheetUrl);
+        if (csvUrls.length > 0) {
+          try {
+            sheetCsv = await fetchSheetCsv(csvUrls);
+            sheetError = null; // نجحت القراءة المباشرة
+          } catch (e) {
+            if (!sheetError) sheetError = e.message === "not_published" ? "not_published" : "fetch_failed";
+          }
+        } else if (!sheetError) {
+          sheetError = "bad_url";
+        }
+      }
+    }
+
+    // إذا فشلت قراءة الشيت، وضّح للمستخدم ووقف
+    if (sheetUrl && sheetError) {
+      const hasServer = (data.serverUrl || "").trim().length > 0;
+      const msg =
+        sheetError === "not_published"
+          ? "ما گدرت أقرا الشيت — يبدو إنه مو منشور للعامة. روح للشيت: File ← Share ← Publish to web، اضغط Publish، وبعدين دزلي الرابط مرة ثانية."
+          : sheetError === "bad_url"
+          ? "الرابط مو رابط Google Sheets صحيح. تأكد إنه رابط شيت."
+          : hasServer
+          ? "ما گدرت أوصل للشيت عن طريق الخادم. تأكد إن: (١) رابط الخادم صحيح بالإعدادات، (٢) الخادم شغّال، (٣) الشيت منشور. جرّب مرة ثانية."
+          : "ما گدرت أوصل للشيت — Google حجب القراءة المباشرة من المتصفح. للقراءة التلقائية، اضبط رابط الخادم الوسيط من تبويب «إعدادات». أو مؤقتاً: صدّر الشيت CSV وارفعه بزر 📎.";
+      addMsg({ role: "ai", type: "text", text: msg });
+      setTextInput("");
+      setBusy(false);
+      return;
+    }
+
+    // بيانات CSV من ملف مرفوع تُعامل مثل بيانات شيت
+    const csvData = sheetCsv || (pendingCsv ? pendingCsv.text : null);
+
+    const content = [];
+    if (pendingImg)
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: pendingImg.mediaType, data: pendingImg.b64 },
+      });
+    let userText = txt || (pendingImg ? "اقرا هالصورة وسجّل الدفعة إذا تعرفت على الكريتور." : "اقرا بيانات هالشيت وعالج الكامبين.");
+    if (csvData) {
+      userText += `\n\n[بيانات الشيت بصيغة CSV — اقرأها وتعرّف على الكامبين واحسب التكلفة من المعتمدين بس]:\n${csvData}`;
+    }
+    content.push({ type: "text", text: userText });
+
+    apiHistoryRef.current.push({ role: "user", content });
+
+    setTextInput("");
+    setPendingImg(null);
+    setPendingCsv(null);
+    if (taRef.current) taRef.current.style.height = "auto";
+    setBusy(true);
+
+    try {
+      await runConversation();
+      // إذا عالجنا شيت من رابط بنجاح، ذكّر المستخدم يسكّر النشر (مو للملف المرفوع)
+      if (sheetCsv && sheetUrl) {
+        setPublishReminder({ url: sheetUrl });
+      }
+    } catch (e) {
+      addMsg({ role: "ai", type: "text", text: "صار خطأ بالاتصال. تأكد من الانترنت وجرّب مرة ثانية." });
+    }
+    setBusy(false);
+  };
+
+  const runConversation = async () => {
+    let guard = 0;
+    while (guard++ < 10) {
+      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 4000,
+          system: SYSTEM(),
+          tools,
+          messages: apiHistoryRef.current,
+        }),
+      });
+      const json = await resp.json();
+      if (json.type === "error" || !json.content) {
+        addMsg({ role: "ai", type: "text", text: "ما گدرت أكمّل الطلب. جرّب مرة ثانية." });
+        return;
+      }
+
+      const textBlocks = json.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+      if (textBlocks) addMsg({ role: "ai", type: "text", text: textBlocks });
+
+      apiHistoryRef.current.push({ role: "assistant", content: json.content });
+
+      const toolUses = json.content.filter((b) => b.type === "tool_use");
+      if (toolUses.length === 0) return;
+
+      const toolResults = [];
+      for (const tu of toolUses) {
+        const out = runTool(tu.name, tu.input || {});
+        addMsg({ role: "ai", type: "action", tool: tu.name, text: out });
+        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: out });
+      }
+      apiHistoryRef.current.push({ role: "user", content: toolResults });
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  const autoGrow = (e) => {
+    setTextInput(e.target.value);
+    e.target.style.height = "auto";
+    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+  };
+
+  const quickPrompts = [
+    "شكد مجموع الباقي على الكريتورز؟",
+    "منو الكريتورز اللي باقي عليهم فلوس؟",
+    "شكد ربحت من كل الكامبينات؟",
+  ];
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>المساعد الذكي</SectionTitle>
+        <span style={S.chatBadge}>يساعدك بكل شي بالتطبيق</span>
+      </div>
+
+      <div style={S.chatWindow} ref={scrollRef}>
+        {messages.map((m, i) => (
+          <ChatBubble key={i} m={m} />
+        ))}
+
+        {busy && (
+          <div style={S.aiRow}>
+            <div style={S.aiAvatar}>🤖</div>
+            <div style={S.typingBubble}>
+              <span style={S.dot} />
+              <span style={{ ...S.dot, animationDelay: "0.2s" }} />
+              <span style={{ ...S.dot, animationDelay: "0.4s" }} />
+              <span style={{ marginRight: 8, fontSize: 13, color: "#888780" }}>يفكر...</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {publishReminder && (
+        <div style={S.reminderCard}>
+          <div style={S.reminderTop}>
+            <span style={S.reminderIcon}>🔔</span>
+            <div style={{ flex: 1 }}>
+              <div style={S.reminderTitle}>تذكير: سكّر النشر مال الشيت</div>
+              <div style={S.reminderText}>
+                خلّصت معالجة الكامبين. إذا تريد الشيت ما يبقى مكشوف للعامة، روح سكّر النشر: افتح الشيت ← File ← Share ← Publish to web ← <b>Stop publishing</b>.
+              </div>
+            </div>
+          </div>
+          <div style={S.reminderActions}>
+            <a href={publishReminder.url} target="_blank" rel="noopener noreferrer" style={S.reminderLink}>
+              🔗 افتح الشيت
+            </a>
+            <button style={S.reminderDone} onClick={() => setPublishReminder(null)}>
+              ✓ سكّرته
+            </button>
+            <button style={S.reminderLater} onClick={() => setPublishReminder(null)}>
+              لاحقاً
+            </button>
+          </div>
+        </div>
+      )}
+
+      {messages.length <= 1 && (
+        <div style={S.quickRow}>
+          {quickPrompts.map((q, i) => (
+            <button
+              key={i}
+              style={S.quickChip}
+              onClick={() => {
+                setTextInput(q);
+                setTimeout(send, 50);
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pendingImg && (
+        <div style={S.imgPreview}>
+          <img src={pendingImg.dataUrl} alt="مرفق" style={S.imgPreviewThumb} />
+          <span style={{ fontSize: 13, color: "#5F5E5A", flex: 1 }}>
+            صورة جاهزة للإرسال — اكتب تعليق (اختياري) واضغط إرسال
+          </span>
+          <button style={S.imgRemove} onClick={() => setPendingImg(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      {pendingCsv && (
+        <div style={S.imgPreview}>
+          <span style={S.fileChipIcon}>📄</span>
+          <span style={{ fontSize: 13, color: "#5F5E5A", flex: 1 }}>
+            <b>{pendingCsv.name}</b> — ملف جاهز. اكتب اسم الكامبين (اختياري) واضغط إرسال وآني أعالجه.
+          </span>
+          <button style={S.imgRemove} onClick={() => setPendingCsv(null)}>
+            ✕
+          </button>
+        </div>
+      )}
+
+      <div style={S.composer}>
+        <button style={S.attachBtn} onClick={() => fileRef.current?.click()} disabled={busy} title="ارفع صورة أو ملف CSV">
+          📎
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.csv,.tsv,.txt,text/csv,text/plain"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files[0];
+            if (f) attachFile(f);
+            e.target.value = "";
+          }}
+        />
+        <textarea
+          ref={taRef}
+          style={S.composerInput}
+          value={textInput}
+          onChange={autoGrow}
+          onKeyDown={onKeyDown}
+          placeholder="اكتب رسالتك... (مثلاً: أضف كريتور اسمه علي سوبر كي 9988 سعره 40 ألف)"
+          rows={1}
+        />
+        <button style={S.sendBtn} onClick={send} disabled={busy || (!textInput.trim() && !pendingImg && !pendingCsv)}>
+          إرسال
+        </button>
+      </div>
+
+      <div style={S.chatNote}>
+        💡 المساعد يقرا شيتات Google المنشورة (دزّ الرابط)، أو ارفع ملف CSV بزر 📎 إذا الرابط ما اشتغل. ويقرا سكرين شوت Super Qi. لقراءة شيت كامبين: انشره (Publish to web) أو صدّره CSV وارفعه، وآني أحسب التكلفة من المعتمدين بس.
+      </div>
+    </div>
+  );
+}
+
+function ChatBubble({ m }) {
+  if (m.role === "user") {
+    return (
+      <div style={S.userRow}>
+        {m.type === "image" ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <img src={m.src} alt="مرفق" style={S.userImg} />
+            {m.caption ? <div style={S.userBubble}>{m.caption}</div> : null}
+          </div>
+        ) : m.type === "file" ? (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+            <div style={S.userFile}>📄 {m.name}</div>
+            {m.caption ? <div style={S.userBubble}>{m.caption}</div> : null}
+          </div>
+        ) : (
+          <div style={S.userBubble}>{m.text}</div>
+        )}
+      </div>
+    );
+  }
+  if (m.type === "action") {
+    return (
+      <div style={S.aiRow}>
+        <div style={S.aiAvatar}>🤖</div>
+        <div style={S.actionCard}>
+          <span style={S.actionDot}>✓</span>
+          <span>{m.text}</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={S.aiRow}>
+      <div style={S.aiAvatar}>🤖</div>
+      <div style={m.type === "success" ? S.successBubble : S.aiBubble}>
+        {m.text.split("\n").map((line, i) => (
+          <div key={i}>{line || "\u00A0"}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// تبويب الإعدادات
+// ============================================================================
+function SettingsTab({ data, setData, upd }) {
+  const [cap, setCap] = useState(data.capital || 0);
+  const [srv, setSrv] = useState(data.serverUrl || "");
+  const [srvTest, setSrvTest] = useState(""); // نتيجة فحص الخادم
+  const [msg, setMsg] = useState("");
+
+  const testServer = async () => {
+    const base = (srv || "").trim().replace(/\/+$/, "");
+    if (!base) {
+      setSrvTest("✕ اكتب رابط الخادم أول");
+      return;
+    }
+    if (!/^https:\/\//.test(base)) {
+      setSrvTest("✕ الرابط لازم يبدي بـ https://");
+      return;
+    }
+    setSrvTest("... أفحص الخادم (ممكن ياخذ نص دقيقة إذا نايم)");
+    // نجرّب عدة مرات لأن الخادم المجاني ممكن يكون نايم
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 60000);
+        const resp = await fetch(`${base}/health`, { signal: ctrl.signal });
+        clearTimeout(t);
+        const j = await resp.json();
+        if (j && j.ok) {
+          setSrvTest("✓ الخادم شغّال وجاهز");
+          return;
+        }
+        setSrvTest("✕ الخادم رد بشكل غير متوقع");
+        return;
+      } catch (e) {
+        if (attempt === 0) setSrvTest("... الخادم يصحى من النوم، انتظر شوية");
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+    }
+    setSrvTest("✕ ما گدرت أوصل للخادم. تأكد إنه Live بـ Render، وإن الرابط صحيح كامل.");
+  };
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ugc-finance-${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        setData({ ...EMPTY, ...parsed });
+        setCap(parsed.capital || 0);
+        setSrv(parsed.serverUrl || "");
+        setMsg("✓ تم استيراد البيانات بنجاح");
+        setTimeout(() => setMsg(""), 3000);
+      } catch {
+        setMsg("✕ الملف غير صالح");
+        setTimeout(() => setMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const counts = {
+    creators: data.creators.length,
+    campaigns: data.campaigns.length,
+    expenses: data.expenses.length,
+  };
+
+  return (
+    <div>
+      <SectionTitle>الإعدادات والبيانات</SectionTitle>
+
+      <div style={S.panel}>
+        <div style={S.panelTitle}>رأس المال / الرصيد الابتدائي</div>
+        <p style={S.settingHint}>
+          المبلغ اللي بديت بيه قبل أي إيراد. الرصيد الحالي يُحسب من هذا + الإيرادات − كل المصروفات.
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <input
+            style={{ ...S.input, maxWidth: 220 }}
+            type="number"
+            value={cap}
+            onChange={(e) => setCap(e.target.value)}
+            placeholder="0"
+          />
+          <button
+            style={S.primaryBtn}
+            onClick={() => {
+              upd((d) => {
+                d.capital = Number(cap) || 0;
+                return d;
+              });
+              setMsg("✓ تم حفظ رأس المال");
+              setTimeout(() => setMsg(""), 2500);
+            }}
+          >
+            حفظ
+          </button>
+        </div>
+      </div>
+
+      <div style={{ ...S.panel, borderColor: "#9FE1D8" }}>
+        <div style={{ ...S.panelTitle, color: "#0A4A42" }}>🔗 رابط الخادم (للقراءة التلقائية من Google Sheets)</div>
+        <p style={S.settingHint}>
+          إذا فتحت التطبيق من موقعك المنشور (Render)، القراءة التلقائية تشتغل لحالها بدون ما تحط أي شي هنا. اتركه فارغ. حط رابط بس إذا الخادم بمكان ثاني غير موقع التطبيق.
+        </p>
+        <input
+          style={{ ...S.input, direction: "ltr", textAlign: "left", marginBottom: 10 }}
+          value={srv}
+          onChange={(e) => {
+            setSrv(e.target.value);
+            setSrvTest("");
+          }}
+          placeholder="https://your-server.onrender.com"
+        />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            style={S.primaryBtn}
+            onClick={() => {
+              upd((d) => {
+                d.serverUrl = (srv || "").trim();
+                return d;
+              });
+              setMsg("✓ تم حفظ رابط الخادم");
+              setTimeout(() => setMsg(""), 2500);
+            }}
+          >
+            حفظ
+          </button>
+          <button style={S.secondaryBtn} onClick={testServer}>
+            افحص الاتصال
+          </button>
+          {srvTest && (
+            <span style={{ fontSize: 13, fontWeight: 600, color: srvTest.startsWith("✓") ? "#0F6E56" : srvTest.startsWith("✕") ? "#A32D2D" : "#888780" }}>
+              {srvTest}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={S.panel}>
+        <div style={S.panelTitle}>نسخ احتياطي للبيانات</div>
+        <p style={S.settingHint}>
+          البيانات محفوظة تلقائياً داخل المتصفح. للأمان الإضافي، صدّر نسخة ملف تحتفظ بيها أو تنقلها لجهاز ثاني.
+        </p>
+        <div style={S.dataRow}>
+          <div style={S.dataStat}><b>{counts.creators}</b> كريتور</div>
+          <div style={S.dataStat}><b>{counts.campaigns}</b> كامبين</div>
+          <div style={S.dataStat}><b>{counts.expenses}</b> صرفية</div>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button style={S.primaryBtn} onClick={exportData}>⬇ تصدير نسخة (JSON)</button>
+          <label style={S.secondaryBtn}>
+            ⬆ استيراد نسخة
+            <input type="file" accept=".json" onChange={importData} style={{ display: "none" }} />
+          </label>
+        </div>
+      </div>
+
+      <div style={{ ...S.panel, borderColor: "#F0997B" }}>
+        <div style={{ ...S.panelTitle, color: "#993C1D" }}>منطقة الخطر</div>
+        <p style={S.settingHint}>مسح كل البيانات نهائياً. ما يمكن التراجع — صدّر نسخة أول.</p>
+        <button
+          style={S.dangerBtn}
+          onClick={() => {
+            if (confirm("متأكد تريد تمسح كل البيانات؟ ما راح ترجع.")) {
+              setData(EMPTY);
+              setCap(0);
+              setMsg("تم مسح كل البيانات");
+              setTimeout(() => setMsg(""), 2500);
+            }
+          }}
+        >
+          مسح كل شي
+        </button>
+      </div>
+
+      {msg && <div style={S.toast}>{msg}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
+// مكوّنات مشتركة
+// ============================================================================
+function Shell({ children }) {
+  return (
+    <div dir="rtl" style={S.shell}>
+      <style>{`
+        @keyframes ugcblink {
+          0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+          40% { opacity: 1; transform: scale(1); }
+        }
+        @media (max-width: 640px) {
+          ::-webkit-scrollbar { width: 6px; }
+        }
+      `}</style>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ children, noMargin }) {
+  return <h2 style={{ ...S.sectionTitle, marginBottom: noMargin ? 0 : 16 }}>{children}</h2>;
+}
+
+function StatCard({ label, value, hint, big, tone, raw }) {
+  const color =
+    tone === "good" ? "#0F6E56" : tone === "bad" ? "#A32D2D" : tone === "warn" ? "#854F0B" : "#0A4A42";
+  return (
+    <div style={{ ...S.statCard, ...(big ? S.statCardBig : {}) }}>
+      <div style={S.statLabel}>{label}</div>
+      <div style={{ ...S.statValue, color, fontSize: big ? 34 : 26 }}>
+        {raw ? value : fmt(value)}
+      </div>
+      {hint && <div style={S.statHint}>{hint}</div>}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, tone, raw }) {
+  const color = tone === "good" ? "#0F6E56" : tone === "bad" ? "#A32D2D" : "#2C2C2A";
+  return (
+    <div style={S.miniStat}>
+      <div style={S.miniLabel}>{label}</div>
+      <div style={{ ...S.miniValue, color }}>{raw ? value : fmt(value)}</div>
+    </div>
+  );
+}
+
+function FlowRow({ label, value, bold, tone }) {
+  const color = tone === "good" ? "#0F6E56" : tone === "bad" ? "#A32D2D" : value < 0 ? "#993C1D" : "#2C2C2A";
+  return (
+    <div style={{ ...S.flowRow, fontWeight: bold ? 600 : 400 }}>
+      <span style={{ color: "#5F5E5A" }}>{label}</span>
+      <span style={{ color, fontVariantNumeric: "tabular-nums" }}>
+        {value < 0 ? "−" : ""}{fmt(Math.abs(value))}
+      </span>
+    </div>
+  );
+}
+
+function StatusPill({ status }) {
+  const s = STATUS[status];
+  return (
+    <span style={{ ...S.pill, background: s.bg, color: s.t }}>
+      <span style={{ width: 6, height: 6, borderRadius: 99, background: s.c, display: "inline-block" }} />
+      {s.label}
+    </span>
+  );
+}
+
+function SaveBadge({ state }) {
+  if (state === "idle") return null;
+  return (
+    <span style={S.saveBadge}>
+      {state === "saving" ? "...يحفظ" : "✓ محفوظ"}
+    </span>
+  );
+}
+
+function Empty({ text }) {
+  return <div style={S.empty}>{text}</div>;
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={S.field}>
+      <label style={S.fieldLabel}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function FormActions({ onSave, onCancel }) {
+  return (
+    <div style={S.formActions}>
+      <button style={S.secondaryBtn} onClick={onCancel}>إلغاء</button>
+      <button style={S.primaryBtn} onClick={onSave}>حفظ</button>
+    </div>
+  );
+}
+
+function Modal({ title, children, onClose, wide }) {
+  return (
+    <div style={S.modalOverlay} onClick={onClose}>
+      <div
+        style={{ ...S.modal, maxWidth: wide ? 560 : 440 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={S.modalHead}>
+          <span style={S.modalTitle}>{title}</span>
+          <button style={S.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <div style={S.modalBody}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// الأنماط
+// ============================================================================
+const FONT = "'Segoe UI', 'Tahoma', system-ui, -apple-system, sans-serif";
+
+const S = {
+  shell: {
+    fontFamily: FONT,
+    background: "#FBFAF7",
+    minHeight: "100vh",
+    color: "#2C2C2A",
+    direction: "rtl",
+  },
+  app: { maxWidth: 1100, margin: "0 auto", padding: "0 16px 60px" },
+
+  // header
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "18px 4px",
+  },
+  brand: { display: "flex", alignItems: "center", gap: 12 },
+  brandMark: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    background: "linear-gradient(135deg, #0F9E8E 0%, #0A4A42 100%)",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontWeight: 800,
+    fontSize: 14,
+    letterSpacing: 0.5,
+  },
+  brandName: { fontWeight: 700, fontSize: 17 },
+  brandSub: { fontSize: 12.5, color: "#888780" },
+  headerRight: { display: "flex", alignItems: "center", gap: 12 },
+  logoutBtn: {
+    background: "transparent",
+    border: "1px solid #D3D1C7",
+    borderRadius: 8,
+    padding: "7px 14px",
+    fontSize: 13,
+    cursor: "pointer",
+    color: "#5F5E5A",
+    fontFamily: FONT,
+  },
+  saveBadge: {
+    fontSize: 12,
+    color: "#0F6E56",
+    background: "#E1F5EE",
+    padding: "4px 10px",
+    borderRadius: 99,
+  },
+
+  // tabs
+  tabBar: {
+    display: "flex",
+    gap: 4,
+    borderBottom: "1px solid #E8E6DE",
+    marginBottom: 24,
+    overflowX: "auto",
+  },
+  tab: {
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    background: "transparent",
+    border: "none",
+    borderBottom: "2px solid transparent",
+    padding: "12px 14px",
+    fontSize: 14,
+    color: "#888780",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    fontFamily: FONT,
+    fontWeight: 500,
+  },
+  tabActive: { color: "#0A4A42", borderBottom: "2px solid #0F9E8E", fontWeight: 700 },
+
+  main: {},
+  sectionTitle: { fontSize: 19, fontWeight: 700, color: "#2C2C2A", margin: 0 },
+
+  tabHead: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 18,
+    flexWrap: "wrap",
+    gap: 12,
+  },
+
+  // cards
+  cardGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+    gap: 14,
+    marginBottom: 22,
+  },
+  statCard: {
+    background: "#fff",
+    border: "1px solid #EBE9E1",
+    borderRadius: 14,
+    padding: "18px 20px",
+  },
+  statCardBig: { gridColumn: "span 1", borderColor: "#9FE1D8", background: "#F2FBF9" },
+  statLabel: { fontSize: 13, color: "#888780", marginBottom: 8 },
+  statValue: { fontWeight: 800, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 },
+  statHint: { fontSize: 12, color: "#A8A69C", marginTop: 7, lineHeight: 1.5 },
+
+  twoCol: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: 16,
+    marginBottom: 20,
+  },
+  panel: {
+    background: "#fff",
+    border: "1px solid #EBE9E1",
+    borderRadius: 14,
+    padding: "18px 20px",
+    marginBottom: 16,
+  },
+  panelTitle: { fontSize: 15, fontWeight: 700, marginBottom: 14, color: "#2C2C2A" },
+
+  // bars
+  barRow: { display: "flex", alignItems: "center", gap: 12, marginBottom: 11 },
+  barLabel: { fontSize: 13.5, minWidth: 80, color: "#444441" },
+  barTrack: { flex: 1, height: 8, background: "#F1EFE8", borderRadius: 99, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 99 },
+  barVal: { fontSize: 13.5, fontWeight: 700, minWidth: 70, textAlign: "left", fontVariantNumeric: "tabular-nums" },
+
+  // flow rows
+  flowRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    padding: "9px 0",
+    fontSize: 14,
+    borderBottom: "1px solid #F4F2EB",
+  },
+  flowDivider: { height: 2, background: "#E8E6DE", margin: "6px 0" },
+
+  alert: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "#FCEBEB",
+    border: "1px solid #F0997B",
+    borderRadius: 12,
+    padding: "13px 16px",
+    fontSize: 13.5,
+    color: "#712B13",
+    lineHeight: 1.6,
+  },
+
+  // filters / chips
+  filterRow: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+  chip: {
+    background: "#fff",
+    border: "1px solid #E0DED5",
+    borderRadius: 99,
+    padding: "6px 16px",
+    fontSize: 13,
+    cursor: "pointer",
+    color: "#5F5E5A",
+    fontFamily: FONT,
+  },
+  chipActive: { background: "#0A4A42", color: "#fff", borderColor: "#0A4A42", fontWeight: 600 },
+
+  // tables
+  tableWrap: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, overflow: "hidden" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5 },
+  th: { textAlign: "right", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
+  thNum: { textAlign: "left", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
+  thAct: { width: 110, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
+  tr: { borderBottom: "1px solid #F4F2EB" },
+  td: { padding: "12px 16px", verticalAlign: "middle" },
+  tdMuted: { padding: "12px 16px", color: "#888780", verticalAlign: "middle" },
+  tdNum: { padding: "12px 16px", textAlign: "left", fontVariantNumeric: "tabular-nums", fontWeight: 600, verticalAlign: "middle" },
+  tdAct: { padding: "10px 16px", verticalAlign: "middle" },
+  cName: { fontWeight: 600, color: "#2C2C2A" },
+  cHandle: { fontSize: 12, color: "#A8A69C", marginTop: 2 },
+  tdMono: { padding: "12px 16px", color: "#444441", verticalAlign: "middle", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
+  tdKey: { padding: "12px 16px", verticalAlign: "middle", fontWeight: 700, color: "#0A4A42", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
+
+  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #9FE1D8", borderRadius: 12, padding: "4px 14px", marginBottom: 14 },
+  searchIcon: { fontSize: 15, opacity: 0.6 },
+  searchInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "9px 4px", fontFamily: FONT, background: "transparent", color: "#2C2C2A" },
+  searchClear: { width: 26, height: 26, borderRadius: 7, border: "none", background: "#F1EFE8", cursor: "pointer", fontSize: 12, color: "#888780" },
+  lookupBar: { fontSize: 13.5, marginBottom: 12 },
+  lookupCards: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 20 },
+  lookupCard: { background: "#E1F5F2", border: "1px solid #9FE1D8", borderRadius: 12, padding: "14px 16px" },
+  lookupName: { fontWeight: 700, fontSize: 15.5, color: "#0A4A42" },
+  lookupHandle: { fontSize: 12.5, color: "#5DCAA5", marginTop: 2, marginBottom: 10, direction: "ltr", textAlign: "right" },
+  lookupRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid #BCEAE1" },
+  lookupKey: { fontSize: 12.5, color: "#0F6E56" },
+  lookupVal: { fontSize: 14, color: "#2C2C2A", fontVariantNumeric: "tabular-nums", direction: "ltr" },
+
+  actGroup: { display: "flex", gap: 6, justifyContent: "flex-start" },
+  iconBtn: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5F5E5A" },
+  iconBtnGood: { width: 30, height: 30, borderRadius: 8, border: "1px solid #9FE1CB", background: "#E1F5EE", cursor: "pointer", fontSize: 13, color: "#0F6E56", fontWeight: 700 },
+  iconBtnDanger: { width: 30, height: 30, borderRadius: 8, border: "1px solid #F4C0B3", background: "#FCEBEB", cursor: "pointer", fontSize: 12, color: "#A32D2D" },
+
+  pill: { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 99, fontSize: 12.5, fontWeight: 600 },
+
+  statusSelect: { border: "1px solid transparent", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT, appearance: "none", WebkitAppearance: "none", outline: "none", maxWidth: 150 },
+  pubCell: { display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" },
+  linkOk: { fontSize: 12, color: "#0F6E56", background: "#E1F5EE", border: "1px solid #9FE1CB", borderRadius: 7, padding: "3px 9px", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap" },
+  linkMissing: { fontSize: 12, color: "#854F0B", background: "#FAEEDA", border: "1px solid #FAC775", borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap" },
+
+  // campaigns
+  campList: { display: "flex", flexDirection: "column", gap: 14 },
+  campCard: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, padding: "18px 20px" },
+  campTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
+  campName: { fontWeight: 700, fontSize: 16, color: "#2C2C2A" },
+  campClient: { fontSize: 12.5, color: "#888780", marginTop: 3 },
+  campStats: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 },
+  miniStat: { background: "#FBFAF7", borderRadius: 10, padding: "11px 13px" },
+  miniLabel: { fontSize: 11.5, color: "#888780", marginBottom: 5 },
+  miniValue: { fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" },
+
+  splitBox: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14, paddingTop: 14, borderTop: "1px solid #F4F2EB" },
+  splitChip: { display: "flex", alignItems: "center", gap: 8, background: "#E1F5F2", borderRadius: 99, padding: "5px 13px", fontSize: 12.5, color: "#0A4A42" },
+  splitPct: { fontWeight: 700, color: "#0F9E8E" },
+  splitAmt: { fontWeight: 700, color: "#0F6E56", borderRight: "1px solid #9FE1D8", paddingRight: 8 },
+
+  // forms
+  field: { marginBottom: 14 },
+  fieldLabel: { display: "block", fontSize: 13, color: "#5F5E5A", marginBottom: 6, fontWeight: 600 },
+  input: {
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #D3D1C7",
+    borderRadius: 9,
+    fontSize: 14,
+    fontFamily: FONT,
+    boxSizing: "border-box",
+    background: "#fff",
+    color: "#2C2C2A",
+  },
+  formRow: { display: "flex", gap: 12 },
+  formActions: { display: "flex", gap: 10, justifyContent: "flex-start", marginTop: 20 },
+
+  primaryBtn: { background: "#0A4A42", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  secondaryBtn: { background: "#fff", color: "#5F5E5A", border: "1px solid #D3D1C7", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
+  smallBtn: { background: "#E1F5F2", color: "#0F9E8E", border: "1px solid #9FE1D8", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  dangerBtn: { background: "#FCEBEB", color: "#A32D2D", border: "1px solid #F0997B", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+
+  profitBanner: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F1EFE8", borderRadius: 10, padding: "12px 16px", fontSize: 14, margin: "6px 0 16px", fontWeight: 600 },
+
+  splitHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  splitHint: { fontSize: 12.5, color: "#A8A69C", marginBottom: 10 },
+  splitRow: { display: "flex", gap: 8, alignItems: "center", marginBottom: 9 },
+  splitCalc: { minWidth: 70, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#0F6E56", fontVariantNumeric: "tabular-nums" },
+  splitTotal: { fontSize: 13, fontWeight: 600, marginTop: 6 },
+
+  // expenses
+  typePill: { padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 600 },
+  typeCompany: { background: "#E6F1FB", color: "#185FA5" },
+  typePersonal: { background: "#FAEEDA", color: "#854F0B" },
+
+  // settings
+  settingHint: { fontSize: 13, color: "#888780", lineHeight: 1.6, marginBottom: 14 },
+  dataRow: { display: "flex", gap: 18, marginBottom: 16, flexWrap: "wrap" },
+  dataStat: { fontSize: 13.5, color: "#5F5E5A" },
+  toast: { position: "fixed", bottom: 24, right: 24, background: "#0A4A42", color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" },
+
+  // empty
+  empty: { textAlign: "center", padding: "50px 20px", color: "#A8A69C", fontSize: 14, background: "#fff", border: "1px dashed #E0DED5", borderRadius: 14 },
+
+  // chat
+  chatBadge: { fontSize: 12, color: "#0F6E56", background: "#E1F5F2", padding: "5px 12px", borderRadius: 99, border: "1px solid #9FE1D8" },
+  chatWindow: { background: "#FBFAF7", border: "1px solid #EBE9E1", borderRadius: 16, padding: 18, minHeight: 360, maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 },
+  aiRow: { display: "flex", gap: 10, alignItems: "flex-start" },
+  aiAvatar: { width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #0F9E8E 0%, #0A4A42 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 },
+  aiBubble: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#2C2C2A", maxWidth: "78%" },
+  successBubble: { background: "#E1F5EE", border: "1px solid #9FE1CB", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#0F6E56", fontWeight: 600, maxWidth: "78%" },
+  userRow: { display: "flex", justifyContent: "flex-start", flexDirection: "row-reverse" },
+  userBubble: { background: "#0A4A42", color: "#fff", borderRadius: 14, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, maxWidth: "78%" },
+  userImg: { maxWidth: 240, maxHeight: 320, borderRadius: 12, border: "2px solid #9FE1D8", objectFit: "cover" },
+  userFile: { background: "#0A4A42", color: "#fff", borderRadius: 12, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, fontWeight: 600 },
+  typingBubble: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", display: "flex", alignItems: "center", gap: 5 },
+  dot: { width: 7, height: 7, borderRadius: 99, background: "#5DCAA5", display: "inline-block", animation: "ugcblink 1.4s infinite both" },
+
+  confirmCard: { background: "#fff", border: "2px solid #9FE1D8", borderRadius: 14, borderTopRightRadius: 4, padding: "16px 18px", maxWidth: "82%", minWidth: 280 },
+  confirmHead: { fontSize: 14, fontWeight: 700, color: "#0A4A42", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid #E1F5F2" },
+  confirmRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", fontSize: 14 },
+  confirmKey: { color: "#888780", fontSize: 13 },
+  confirmActions: { display: "flex", gap: 8, marginTop: 14 },
+  confirmBtn: { flex: 1, background: "#0A4A42", color: "#fff", border: "none", borderRadius: 9, padding: "11px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT },
+  confirmCancel: { background: "#fff", color: "#888780", border: "1px solid #D3D1C7", borderRadius: 9, padding: "11px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+
+  chatInputBar: { display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #EBE9E1", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
+  uploadBtn: { background: "#E1F5F2", color: "#0A4A42", border: "1px solid #9FE1D8", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  pasteHint: { fontSize: 13, color: "#A8A69C" },
+  chatNote: { fontSize: 13, color: "#5F5E5A", background: "#F2FBF9", border: "1px solid #9FE1D8", borderRadius: 10, padding: "12px 16px", lineHeight: 1.6 },
+
+  reminderCard: { background: "#FAEEDA", border: "1px solid #FAC775", borderRadius: 12, padding: "14px 16px", marginBottom: 12 },
+  reminderTop: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12 },
+  reminderIcon: { fontSize: 18, flexShrink: 0 },
+  reminderTitle: { fontSize: 14, fontWeight: 700, color: "#854F0B", marginBottom: 4 },
+  reminderText: { fontSize: 13, color: "#7A4B0C", lineHeight: 1.6 },
+  reminderActions: { display: "flex", gap: 8, flexWrap: "wrap" },
+  reminderLink: { fontSize: 13, color: "#854F0B", background: "#fff", border: "1px solid #FAC775", borderRadius: 8, padding: "8px 14px", textDecoration: "none", fontWeight: 600 },
+  reminderDone: { fontSize: 13, color: "#fff", background: "#BA7517", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontFamily: FONT },
+  reminderLater: { fontSize: 13, color: "#854F0B", background: "transparent", border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 600, fontFamily: FONT },
+
+  quickRow: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 },
+  quickChip: { background: "#fff", color: "#0A4A42", border: "1px solid #9FE1D8", borderRadius: 99, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONT },
+
+  composer: { display: "flex", alignItems: "flex-end", gap: 8, background: "#fff", border: "1px solid #9FE1D8", borderRadius: 14, padding: "8px 10px", marginBottom: 12 },
+  attachBtn: { width: 40, height: 40, borderRadius: 10, border: "1px solid #E0DED5", background: "#FBFAF7", cursor: "pointer", fontSize: 18, flexShrink: 0 },
+  composerInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "10px 6px", fontFamily: FONT, background: "transparent", color: "#2C2C2A", resize: "none", lineHeight: 1.5, maxHeight: 120 },
+  sendBtn: { background: "#0A4A42", color: "#fff", border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, flexShrink: 0, height: 40 },
+
+  imgPreview: { display: "flex", alignItems: "center", gap: 12, background: "#F2FBF9", border: "1px solid #9FE1D8", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
+  imgPreviewThumb: { width: 48, height: 48, borderRadius: 8, objectFit: "cover", border: "1px solid #9FE1D8" },
+  fileChipIcon: { fontSize: 26, flexShrink: 0 },
+  imgRemove: { width: 28, height: 28, borderRadius: 7, border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: "#888780", flexShrink: 0 },
+
+  actionCard: { display: "flex", alignItems: "flex-start", gap: 10, background: "#E1F5EE", border: "1px solid #9FE1CB", borderRadius: 14, borderTopRightRadius: 4, padding: "11px 15px", fontSize: 14, color: "#0F6E56", fontWeight: 500, lineHeight: 1.6, maxWidth: "82%" },
+  actionDot: { width: 20, height: 20, borderRadius: 99, background: "#1D9E75", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1 },
+
+  // modal
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(8,40,36,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto" },
+  modal: { background: "#fff", borderRadius: 16, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", display: "flex", flexDirection: "column" },
+  modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: "1px solid #EBE9E1" },
+  modalTitle: { fontSize: 16, fontWeight: 700, color: "#2C2C2A" },
+  modalClose: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#888780" },
+  modalBody: { padding: 22, overflowY: "auto" },
+
+  // lock
+  lockWrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
+  lockCard: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 18, padding: "40px 36px", textAlign: "center", maxWidth: 360, width: "100%", boxShadow: "0 8px 40px rgba(0,0,0,0.06)" },
+  lockIcon: { fontSize: 36, marginBottom: 14 },
+  lockTitle: { fontSize: 21, fontWeight: 800, color: "#0A4A42", margin: "0 0 8px" },
+  lockSub: { fontSize: 13.5, color: "#888780", margin: "0 0 24px", lineHeight: 1.6 },
+  lockInput: { width: "100%", padding: "13px", border: "1px solid #D3D1C7", borderRadius: 11, fontSize: 22, textAlign: "center", letterSpacing: 8, fontFamily: FONT, boxSizing: "border-box", marginBottom: 12 },
+  lockErr: { color: "#A32D2D", fontSize: 13, marginBottom: 12 },
+  lockBtn: { width: "100%", background: "#0A4A42", color: "#fff", border: "none", borderRadius: 11, padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT },
+};
+
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(React.createElement(App));
+</script>
+</body>
+</html>
