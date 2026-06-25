@@ -1,0 +1,12 @@
+{
+  "name": "ugc-sheets-proxy",
+  "version": "1.0.0",
+  "description": "خادم وسيط لقراءة Google Sheets المنشورة لتطبيق UGC Iraq",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
