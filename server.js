@@ -75,6 +75,50 @@ function fetchUrl(url, depth = 0) {
   });
 }
 
+// يرسل طلب POST لـ Anthropic API ويرجّع الرد (الخادم يكلّم Claude نيابة عن التطبيق)
+function callClaude(bodyObj) {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return reject(new Error("no_api_key"));
+
+    const payload = JSON.stringify(bodyObj);
+    const opts = {
+      method: "POST",
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(payload),
+      },
+    };
+    const req = https.request(opts, (res) => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", (c) => (data += c));
+      res.on("end", () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on("error", reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+// يقرا جسم الطلب الوارد (JSON) من التطبيق
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.setEncoding("utf8");
+    req.on("data", (c) => {
+      data += c;
+      if (data.length > 10 * 1024 * 1024) reject(new Error("too_large")); // حد 10MB
+    });
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
+
 // يجرّب كل رابط CSV لحد ما يلگي بيانات صحيحة
 async function getSheetCsv(sheetUrl) {
   const urls = buildCsvUrls(sheetUrl);
@@ -106,8 +150,8 @@ async function getSheetCsv(sheetUrl) {
 const server = http.createServer(async (req, res) => {
   // السماح لأي موقع يتصل (CORS) — حتى التطبيق يگدر يطلب
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key, anthropic-version");
 
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -150,6 +194,28 @@ const server = http.createServer(async (req, res) => {
       const code = e.message === "not_published" ? "not_published" : e.message === "bad_url" ? "bad_url" : "fetch_failed";
       res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
       return res.end(JSON.stringify({ error: code }));
+    }
+  }
+
+  // مسار المساعد الذكي: التطبيق يرسل طلبه هنا، والخادم يمرّره لـ Claude
+  if (reqUrl.pathname === "/claude" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      let bodyObj;
+      try {
+        bodyObj = JSON.parse(raw);
+      } catch (e) {
+        res.writeHead(400, { "Content-Type": "application/json; charset=utf-8" });
+        return res.end(JSON.stringify({ error: "bad_json" }));
+      }
+      const result = await callClaude(bodyObj);
+      // نرجّع رد Claude كما هو للتطبيق
+      res.writeHead(result.status, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(result.body);
+    } catch (e) {
+      const code = e.message === "no_api_key" ? "no_api_key" : "claude_failed";
+      res.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
+      return res.end(JSON.stringify({ error: code, detail: String(e.message || e) }));
     }
   }
 
