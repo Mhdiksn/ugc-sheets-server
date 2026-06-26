@@ -924,6 +924,71 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     note: "",
   });
 
+  const [importMsg, setImportMsg] = useState("");
+  // استيراد كريتورز الكامبينات من الشيتات (يربط كل كريتور بكامبينه) — يفعّل نظام المفضلين
+  const importCampaignCreators = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const incoming = JSON.parse(reader.result);
+        const arr = Array.isArray(incoming) ? incoming : (incoming.creators || []);
+        if (!arr.length) { setImportMsg("✕ الملف فارغ"); setTimeout(() => setImportMsg(""), 3000); return; }
+        upd((d) => {
+          d.creators = d.creators || [];
+          // افهرس الموجود بـ (handle+campaign) حتى ما نكرر
+          const norm = (h) => { const m = String(h || "").match(/instagram\.com\/([\w._]+)/) || String(h || "").match(/tiktok\.com\/@([\w._]+)/); return m ? m[1].toLowerCase() : String(h || "").toLowerCase(); };
+          const seen = new Set(d.creators.map((c) => norm(c.handle) + "|" + (c.campaign || "").toLowerCase()));
+          let added = 0;
+          arr.forEach((it) => {
+            const key = norm(it.handle) + "|" + (it.campaign || "").toLowerCase();
+            if (it.handle && seen.has(key)) return; // نفس الكريتور بنفس الكامبين موجود
+            seen.add(key);
+            d.creators.push({
+              id: "c" + Date.now() + Math.random().toString(36).slice(2, 7),
+              name: it.name || "",
+              handle: it.handle || "",
+              phone: it.phone || "",
+              followers: Number(it.followers) || 0,
+              superKey: "",
+              campaign: it.campaign || "",
+              amount: it.amount ? (Number(String(it.amount).replace(/[^\d.]/g, "")) || 0) : 0,
+              paid: 0,
+              payStatus: "paid", // من الشيتات القديمة = مدفوعة ومكتملة
+              pubStatus: "published",
+              pubLink: "",
+              date: it.date || todayISO(),
+              note: it.province ? ("محافظة: " + it.province) : "",
+            });
+            added++;
+          });
+          // أضف الكريتورز للقاعدة بعد (مع المحافظة) إذا مو موجودين
+          d.creatorsDB = d.creatorsDB || [];
+          const dbSeen = new Set(d.creatorsDB.map((c) => norm(c.handle)));
+          arr.forEach((it) => {
+            const k = norm(it.handle);
+            if (!it.handle || dbSeen.has(k)) return;
+            dbSeen.add(k);
+            d.creatorsDB.push({
+              id: "db" + Date.now() + Math.random().toString(36).slice(2, 7),
+              name: it.name || "", handle: it.handle || "", phone: it.phone || "",
+              followers: Number(it.followers) || 0, lastPrice: it.amount ? String(it.amount).replace(/[^\d]/g, "") : "",
+              province: it.province || "", note: "",
+            });
+          });
+          window.setTimeout(() => { setImportMsg("✓ أُضيف " + added + " سجل كامبين — نظام المفضّلين والتكرار صار شغّال"); setTimeout(() => setImportMsg(""), 6000); }, 50);
+          return d;
+        });
+      } catch (err) {
+        setImportMsg("✕ الملف غير صالح");
+        setTimeout(() => setImportMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
   // تصدير/طباعة كشف كامبين كـ PDF (عن طريق نافذة طباعة نظيفة)
   const printCampaignReport = (campName) => {
     const rows = data.creators.filter((c) => (c.campaign || "") === campName);
@@ -1036,9 +1101,16 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     <div>
       <div style={S.tabHead}>
         <SectionTitle noMargin>مدفوعات الكريتورز</SectionTitle>
-        <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
-          + كريتور جديد
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {importMsg && <span style={{ fontSize: 12.5, fontWeight: 700, color: importMsg.startsWith("✓") ? "#0F6E56" : "#A32D2D" }}>{importMsg}</span>}
+          <label style={S.ghostBtn}>
+            📥 استيراد كريتورز الكامبينات
+            <input type="file" accept=".json" onChange={importCampaignCreators} style={{ display: "none" }} />
+          </label>
+          <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
+            + كريتور جديد
+          </button>
+        </div>
       </div>
 
       <div style={S.searchWrap}>
@@ -1440,13 +1512,38 @@ function CampaignsTab({ data, upd, partnerTotals, softDelete }) {
     if (c) softDelete("campaign", c, `حُذف الكامبين «${c.name || "بدون اسم"}»`);
   };
 
+  // إضافة أسماء كل الكامبينات من شيتات الدرايف دفعة وحدة (بدون تكرار الموجود)
+  const [seedMsg, setSeedMsg] = useState("");
+  const seedCampaignNames = () => {
+    const NAMES = ["Alwessam Express","Free Qi Card campaign","Fried","HONOR WATCH6","Pr box vanila","Silver","ban","pr box","shop","wteen","اثاث","احمد العبداللة","احمد العبدالله بصرة","احمد العبدالله بغداد","احمد العبدالله بغداد مواعيد تصوير","احمد العبدالله سماوه","احمد العبدالله كربلاء","الدخون","الدخون - انفلونسر ميكا","الدخون free","الدخون الاماراتي - كامل تصويرهم","الدخون الاماراتي - مالتنا","الدخون الاماراتي - يوم 16","الدخون فيلا","القرية","اميلانو","ايفنت فانيلا","بصرة","بغداد","بلاتينيوم","بلي 2","بيوتي","تطبيق بو","تعاون ايفنت","توترز","حدث لوتو","حقائب نسائية","حملة إطلاق تطبيق بُن رضا علوان","خان الصابون","دار الاعرجي","دوز","دوز 2","ديالى","رضا علوان 2","سبنيس","سبنيس 2","سندريلا","سوبر جكن","سوبر جكن HQ","سوبر جكن low","شاشة ملعب","شامبو","شعر","صيدلية 1","علا ايفنت","فانيلا","فانيلا 1 ترند","فانيلا pr box 3","فانيلا تجمع","فانيلا شاشة الاميرات","فانيلا شاشه عرض","فود بلوكر","قصر عالية","كاذرنك","كافيه دوز","كوفي","كوفي ايدن","لقمه","لوتو العراق الخيري","لي بن","مدرس","مرماز","منتج اجبان","منتج بشره","منتج تقني","منتج شعر","موناليزا للاثاث","ميلو براند","ناصريه","هاي اكسبرس","هونر","وتين","وسام بيوتي 1","يلو فارما"];
+    upd((d) => {
+      d.campaigns = d.campaigns || [];
+      const existing = new Set(d.campaigns.map((c) => (c.name || "").trim().toLowerCase()));
+      let added = 0;
+      NAMES.forEach((nm) => {
+        const key = nm.trim().toLowerCase();
+        if (key && !existing.has(key)) {
+          d.campaigns.push({ id: uid(), name: nm, client: "", revenue: "", cost: "", date: todayISO(), splits: [] });
+          existing.add(key);
+          added++;
+        }
+      });
+      window.setTimeout(() => { setSeedMsg("✓ أضفت " + added + " كامبين جديد"); setTimeout(() => setSeedMsg(""), 5000); }, 50);
+      return d;
+    });
+  };
+
   return (
     <div>
       <div style={S.tabHead}>
         <SectionTitle noMargin>الكامبينات والأرباح</SectionTitle>
-        <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
-          + كامبين جديد
-        </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          {seedMsg && <span style={{ fontSize: 13, fontWeight: 700, color: "#0F6E56" }}>{seedMsg}</span>}
+          <button style={S.ghostBtn} onClick={seedCampaignNames} title="يضيف أسماء كل الكامبينات من شيتات الدرايف">📥 استيراد أسماء الكامبينات</button>
+          <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
+            + كامبين جديد
+          </button>
+        </div>
       </div>
 
       {data.campaigns.length === 0 ? (
@@ -1923,6 +2020,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     win.document.close();
   };
 
+  const q = search.trim().toLowerCase();
   const tier = FOLLOWER_TIERS.find((t) => t.id === followersFilter) || FOLLOWER_TIERS[0];
   const statOf = (c) => creatorStats && creatorStats.byKey[creatorStats.norm(c.handle) || ("name:" + (c.name || "").toLowerCase().trim())];
   const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
