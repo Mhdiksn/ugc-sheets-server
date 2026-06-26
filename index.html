@@ -117,8 +117,9 @@ async function saveAll(data) {
 // ---- بيانات افتراضية فارغة -------------------------------------------------
 const EMPTY = {
   creators: [], // {id, name, handle, phone, superKey, campaign, amount, paid, payStatus, pubStatus, pubLink, date, note}
-  creatorsDB: [], // قاعدة بيانات الكريتورز (بدون دفعات): {id, name, handle, followers, note}
+  creatorsDB: [], // قاعدة بيانات الكريتورز: {id, name, handle, phone, followers, lastPrice, province, note, priceHistory:[{price,date,campaign}]}
   campaigns: [], // {id, name, client, revenue, cost, date, splits:[{name, pct}]}
+  blacklist: [], // البلاك ليست: {id, name, handle, reason, addedBy, addedAt}
   expenses: [], // {id, label, amount, type:'company'|'personal', date, note}
   trash: [], // سلة المحذوفات: {trashId, kind:'creator'|'creatorDB'|'campaign'|'expense', item, deletedAt}
   capital: 0, // رأس مال / رصيد الشركة الابتدائي
@@ -277,6 +278,49 @@ function App() {
       .sort((a, b) => b.amount - a.amount);
   }, [data.campaigns]);
 
+  // ---- إحصائيات نشاط الكريتورز (للمفضلين وكشف الإفراط) ----------------------
+  // يحسب من قائمة المدفوعات: كم كامبين اشتغل وياه كل كريتور، وكم مرة هذا الشهر
+  const creatorStats = useMemo(() => {
+    const norm = (s) => {
+      const h = String(s || "").trim().toLowerCase();
+      const m = h.match(/instagram\.com\/([\w._]+)/) || h.match(/tiktok\.com\/@([\w._]+)/);
+      return m ? m[1] : h;
+    };
+    const now = new Date();
+    const thisMonth = now.getFullYear() + "-" + (now.getMonth() + 1);
+    const map = {}; // key -> {name, handle, campaigns:Set, thisMonthCount, dates:[], prices:[]}
+    (data.creators || []).forEach((c) => {
+      const key = norm(c.handle) || ("name:" + String(c.name || "").toLowerCase().trim());
+      if (!key || key === "name:") return;
+      if (!map[key]) map[key] = { name: c.name || "", handle: c.handle || "", campaigns: new Set(), thisMonthCount: 0, dates: [], prices: [], lastDate: null };
+      const e = map[key];
+      if (c.campaign) e.campaigns.add(c.campaign);
+      if (!e.name && c.name) e.name = c.name;
+      if (!e.handle && c.handle) e.handle = c.handle;
+      const d = c.date || "";
+      if (d) {
+        e.dates.push(d);
+        if (!e.lastDate || d > e.lastDate) e.lastDate = d;
+        const dm = new Date(d);
+        if (!isNaN(dm) && (dm.getFullYear() + "-" + (dm.getMonth() + 1)) === thisMonth) e.thisMonthCount++;
+      }
+      if (Number(c.amount) > 0) e.prices.push({ price: Number(c.amount), date: d, campaign: c.campaign || "" });
+    });
+    // حوّل لكائن بمفاتيح + دوال مساعدة
+    const byKey = {};
+    Object.entries(map).forEach(([k, v]) => {
+      byKey[k] = {
+        name: v.name, handle: v.handle,
+        campaignCount: v.campaigns.size,
+        campaigns: Array.from(v.campaigns),
+        thisMonthCount: v.thisMonthCount,
+        lastDate: v.lastDate,
+        prices: v.prices.sort((a, b) => (a.date || "").localeCompare(b.date || "")),
+      };
+    });
+    return { byKey, norm };
+  }, [data.creators]);
+
   // ---- مُعدّلات البيانات ---------------------------------------------------
   const upd = useCallback((fn) => setData((d) => fn(structuredClone(d))), []);
 
@@ -346,6 +390,49 @@ function App() {
     upd((d) => { d.trash = []; return d; });
   }, [upd]);
 
+  // ---- البلاك ليست ---------------------------------------------------------
+  const addToBlacklist = useCallback((entry) => {
+    upd((d) => {
+      d.blacklist = d.blacklist || [];
+      d.blacklist.unshift({
+        id: "bl" + Date.now() + Math.random().toString(36).slice(2, 6),
+        name: entry.name || "",
+        handle: entry.handle || "",
+        reason: entry.reason || "",
+        addedBy: entry.addedBy || "",
+        addedAt: Date.now(),
+      });
+      return d;
+    });
+  }, [upd]);
+
+  const removeFromBlacklist = useCallback((id) => {
+    upd((d) => {
+      d.blacklist = (d.blacklist || []).filter((b) => b.id !== id);
+      return d;
+    });
+  }, [upd]);
+
+  // دالة فحص: هل هذا الكريتور بالبلاك ليست؟ (تطابق بالرابط أو الاسم)
+  const blacklistSet = useMemo(() => {
+    const norm = (s) => {
+      const h = String(s || "").trim().toLowerCase();
+      const m = h.match(/instagram\.com\/([\w._]+)/) || h.match(/tiktok\.com\/@([\w._]+)/);
+      return m ? m[1] : h;
+    };
+    const set = {};
+    (data.blacklist || []).forEach((b) => {
+      const k = norm(b.handle) || ("name:" + String(b.name || "").toLowerCase().trim());
+      if (k) set[k] = b;
+    });
+    return { set, norm };
+  }, [data.blacklist]);
+
+  const isBlacklisted = useCallback((handle, name) => {
+    const k = blacklistSet.norm(handle) || ("name:" + String(name || "").toLowerCase().trim());
+    return blacklistSet.set[k] || null;
+  }, [blacklistSet]);
+
   // ---- شاشة الدخول ---------------------------------------------------------
   if (!authed) {
     return (
@@ -407,6 +494,7 @@ function App() {
     { id: "chat", label: "المساعد الذكي", icon: "🤖" },
     { id: "campaigns", label: "الكامبينات والأرباح", icon: "📈" },
     { id: "expenses", label: "الصرفيات", icon: "💸" },
+    { id: "blacklist", label: "بلاك ليست", icon: "🚫" },
     { id: "trash", label: "سلة المحذوفات", icon: "🗑️" },
     { id: "settings", label: "إعدادات", icon: "⚙️" },
   ];
@@ -450,17 +538,20 @@ function App() {
 
         <main style={S.main}>
           {tab === "overview" && (
-            <Overview calc={calc} partnerTotals={partnerTotals} data={data} />
+            <Overview calc={calc} partnerTotals={partnerTotals} data={data} creatorStats={creatorStats} />
           )}
           {tab === "creators" && (
-            <CreatorsTab data={data} upd={upd} calc={calc} softDelete={softDelete} />
+            <CreatorsTab data={data} upd={upd} calc={calc} softDelete={softDelete} creatorStats={creatorStats} isBlacklisted={isBlacklisted} addToBlacklist={addToBlacklist} />
           )}
-          {tab === "database" && <DatabaseTab data={data} upd={upd} softDelete={softDelete} />}
+          {tab === "database" && <DatabaseTab data={data} upd={upd} softDelete={softDelete} creatorStats={creatorStats} isBlacklisted={isBlacklisted} addToBlacklist={addToBlacklist} />}
           {tab === "chat" && <ChatTab data={data} upd={upd} softDelete={softDelete} />}
           {tab === "campaigns" && (
             <CampaignsTab data={data} upd={upd} partnerTotals={partnerTotals} softDelete={softDelete} />
           )}
           {tab === "expenses" && <ExpensesTab data={data} upd={upd} calc={calc} softDelete={softDelete} />}
+          {tab === "blacklist" && (
+            <BlacklistTab data={data} addToBlacklist={addToBlacklist} removeFromBlacklist={removeFromBlacklist} />
+          )}
           {tab === "trash" && (
             <TrashTab data={data} restoreFromTrash={restoreFromTrash} purgeFromTrash={purgeFromTrash} emptyTrash={emptyTrash} />
           )}
@@ -485,7 +576,7 @@ function App() {
 // ============================================================================
 // نظرة عامة
 // ============================================================================
-function Overview({ calc, partnerTotals, data }) {
+function Overview({ calc, partnerTotals, data, creatorStats }) {
   const cards = [
     {
       label: "رصيد الشركة الحالي",
@@ -658,6 +749,67 @@ function Overview({ calc, partnerTotals, data }) {
           </div>
         );
       })()}
+
+      {/* ⭐ أكثر الكريتورز تعاملاً (توب 10) */}
+      {creatorStats && Object.keys(creatorStats.byKey).length > 0 && (() => {
+        const top = Object.values(creatorStats.byKey)
+          .filter((s) => s.campaignCount >= 1)
+          .sort((a, b) => b.campaignCount - a.campaignCount)
+          .slice(0, 10);
+        if (!top.length) return null;
+        const maxC = Math.max(...top.map((s) => s.campaignCount), 1);
+        return (
+          <div style={{ marginTop: 28 }}>
+            <SectionTitle>⭐ أكثر الكريتورز تعاملاً وياك</SectionTitle>
+            <div style={S.panel}>
+              {top.map((s, i) => (
+                <div key={i} style={S.barRow}>
+                  <div style={{ ...S.barLabel, minWidth: 160, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ color: "#A8A6A0", fontWeight: 800, fontSize: 12, minWidth: 18 }}>{i + 1}.</span>
+                    <span>{s.name || s.handle || "—"}</span>
+                    {s.campaignCount >= 3 && <span style={S.badgeFav}>⭐</span>}
+                  </div>
+                  <div style={S.barTrack}>
+                    <div style={{ ...S.barFill, width: `${(s.campaignCount / maxC) * 100}%`, background: "#E8A317" }} />
+                  </div>
+                  <div style={{ ...S.barVal, minWidth: 70 }}>{s.campaignCount} كامبين</div>
+                </div>
+              ))}
+            </div>
+            <p style={{ fontSize: 12.5, color: "#888780", margin: "8px 2px 0" }}>
+              💡 هذوله أكثر ناس اشتغلوا وياك — مرشحين ممتازين للتعاون المتكرر بالكامبينات الجاية.
+            </p>
+          </div>
+        );
+      })()}
+
+      {/* 🗺️ توزيع الكريتورز على المحافظات */}
+      {(() => {
+        const byProv = {};
+        (data.creatorsDB || []).forEach((c) => {
+          const p = (c.province || "").trim();
+          if (p) byProv[p] = (byProv[p] || 0) + 1;
+        });
+        const provs = Object.entries(byProv).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+        if (!provs.length) return null;
+        const maxP = Math.max(...provs.map((p) => p.count), 1);
+        return (
+          <div style={{ marginTop: 28 }}>
+            <SectionTitle>🗺️ توزيع الكريتورز على المحافظات</SectionTitle>
+            <div style={S.panel}>
+              {provs.map((p, i) => (
+                <div key={i} style={S.barRow}>
+                  <div style={{ ...S.barLabel, minWidth: 120 }}>{p.name}</div>
+                  <div style={S.barTrack}>
+                    <div style={{ ...S.barFill, width: `${(p.count / maxP) * 100}%`, background: "#0F9E8E" }} />
+                  </div>
+                  <div style={S.barVal}>{p.count}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -665,7 +817,7 @@ function Overview({ calc, partnerTotals, data }) {
 // ============================================================================
 // تبويب مدفوعات الكريتورز
 // ============================================================================
-function CreatorsTab({ data, upd, softDelete }) {
+function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addToBlacklist }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -1068,7 +1220,20 @@ function CreatorsTab({ data, upd, softDelete }) {
                       </td>
                     )}
                     <td style={S.td}>
-                      <div style={S.cName}>{c.name || "—"}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={S.cName}>{c.name || "—"}</span>
+                        {(() => {
+                          const st = creatorStats && creatorStats.byKey[creatorStats.norm(c.handle) || ("name:" + (c.name || "").toLowerCase().trim())];
+                          const bl = isBlacklisted && isBlacklisted(c.handle, c.name);
+                          return (
+                            <>
+                              {bl && <span style={S.badgeBlack} title={bl.reason || "بالبلاك ليست"}>🚫</span>}
+                              {st && st.campaignCount >= 3 && <span style={S.badgeFav} title={`${st.campaignCount} كامبين`}>⭐</span>}
+                              {st && st.thisMonthCount >= 2 && <span style={S.badgeWarn} title={`${st.thisMonthCount} مرات هذا الشهر`}>⚠️{st.thisMonthCount}</span>}
+                            </>
+                          );
+                        })()}
+                      </div>
                       {c.handle && (
                         <a href={toUrl(c.handle)} target="_blank" rel="noopener noreferrer" style={S.cHandleLink}>
                           {c.handle}
@@ -1565,19 +1730,22 @@ function ExpenseForm({ rec, onSave, onCancel }) {
 // ============================================================================
 // تبويب قاعدة الكريتورز — دليل أسماء بدون دفعات، تُستخدم لإضافة كريتورز للكامبينات
 // ============================================================================
-function DatabaseTab({ data, upd, softDelete }) {
+function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addToBlacklist }) {
   const db = data.creatorsDB || [];
   const [search, setSearch] = useState("");
   const [followersFilter, setFollowersFilter] = useState("all"); // تصفية حسب المتابعين
   const [sortBy, setSortBy] = useState("none"); // ترتيب
+  const [specialFilter, setSpecialFilter] = useState("all"); // all | favorites | available
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", note: "" });
+  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "" });
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState({});
   const [showAssign, setShowAssign] = useState(false);
   const [assign, setAssign] = useState({ campaign: "", amount: "" });
   const [msg, setMsg] = useState("");
+  const [blForm, setBlForm] = useState(null); // {name, handle, reason, addedBy} لمودال البلاك ليست
+  const [historyOf, setHistoryOf] = useState(null); // كريتور لعرض سجله
 
   // شرائح فلتر المتابعين
   const FOLLOWER_TIERS = [
@@ -1589,7 +1757,7 @@ function DatabaseTab({ data, upd, softDelete }) {
     { id: "500+", label: "أكثر من 500K", min: 500000, max: Infinity },
   ];
 
-  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", note: "" });
+  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "" });
 
   const saveCreator = () => {
     if (!form.name.trim() && !form.handle.trim()) {
@@ -1606,6 +1774,7 @@ function DatabaseTab({ data, upd, softDelete }) {
           c.phone = form.phone.trim();
           c.followers = Number(form.followers) || 0;
           c.lastPrice = Number(form.lastPrice) || 0;
+          c.province = (form.province || "").trim();
           c.note = form.note.trim();
         }
         return d;
@@ -1619,6 +1788,7 @@ function DatabaseTab({ data, upd, softDelete }) {
         phone: form.phone.trim(),
         followers: Number(form.followers) || 0,
         lastPrice: Number(form.lastPrice) || 0,
+        province: (form.province || "").trim(),
         note: form.note.trim(),
       };
       upd((d) => {
@@ -1631,7 +1801,7 @@ function DatabaseTab({ data, upd, softDelete }) {
   };
 
   const startEdit = (c) => {
-    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", note: c.note || "" });
+    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", province: c.province || "", note: c.note || "" });
     setEditId(c.id);
     setAdding(true);
   };
@@ -1641,12 +1811,136 @@ function DatabaseTab({ data, upd, softDelete }) {
     if (c) softDelete("creatorDB", c, `حُذف «${c.name || c.handle || "بدون اسم"}» من القاعدة`);
   };
 
-  const q = search.trim().toLowerCase();
+  // استيراد قائمة كريتورز ودمجها مع القاعدة (بدون مسح الموجود) — تطابق بالرابط/الاسم
+  const importToDatabase = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        let parsed = JSON.parse(reader.result);
+        // اقبل إما مصفوفة مباشرة أو كائن فيه creatorsDB
+        const incoming = Array.isArray(parsed) ? parsed : (parsed.creatorsDB || parsed.creators || []);
+        if (!Array.isArray(incoming) || incoming.length === 0) {
+          setMsg("✕ الملف ما فيه قائمة كريتورز");
+          setTimeout(() => setMsg(""), 3000);
+          return;
+        }
+        const uname = (h) => {
+          const m = String(h || "").match(/instagram\.com\/([\w._]+)/i) || String(h || "").match(/tiktok\.com\/@([\w._]+)/i);
+          return m ? m[1].toLowerCase() : "";
+        };
+        upd((d) => {
+          const existing = d.creatorsDB || [];
+          // فهرس الموجود بالرابط والاسم
+          const byKey = {};
+          existing.forEach((c) => {
+            const k = uname(c.handle) || ("name:" + (c.name || "").toLowerCase().trim());
+            if (k) byKey[k] = c;
+          });
+          let added = 0, merged = 0;
+          incoming.forEach((it) => {
+            const handle = it.handle || it.link || "";
+            const name = it.name || "";
+            const k = uname(handle) || ("name:" + name.toLowerCase().trim());
+            if (!k) return;
+            if (byKey[k]) {
+              // دمج: كمّل الناقص فقط
+              const ex = byKey[k];
+              if ((!ex.followers || ex.followers === 0) && it.followers) ex.followers = Number(it.followers) || 0;
+              if (!ex.lastPrice && (it.lastPrice || it.cost)) ex.lastPrice = it.lastPrice || it.cost;
+              if (!ex.phone && it.phone) ex.phone = it.phone;
+              if (!ex.note && it.note) ex.note = it.note;
+              merged++;
+            } else {
+              const rec = {
+                id: "d" + Date.now() + Math.random().toString(36).slice(2, 7),
+                name: name,
+                handle: handle,
+                phone: it.phone || "",
+                followers: Number(it.followers) || 0,
+                lastPrice: it.lastPrice || it.cost || "",
+                note: it.note || "",
+              };
+              existing.push(rec);
+              byKey[k] = rec;
+              added++;
+            }
+          });
+          d.creatorsDB = existing;
+          window.setTimeout(() => {
+            setMsg(`✓ أُضيف ${added} كريتور جديد` + (merged ? ` ودُمج ${merged} موجود` : ""));
+            setTimeout(() => setMsg(""), 5000);
+          }, 50);
+          return d;
+        });
+      } catch (err) {
+        setMsg("✕ الملف غير صالح");
+        setTimeout(() => setMsg(""), 3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ""; // اسمح بإعادة رفع نفس الملف
+  };
+
+  // تصدير قائمة القاعدة كـ PDF (نافذة طباعة نظيفة) — يطبع القائمة المفلترة الحالية
+  const printDatabaseList = () => {
+    const rows = list.map((c, i) => {
+      const st = statOf(c);
+      const fav = st && st.campaignCount >= 3 ? "⭐" : "";
+      return `<tr>
+        <td>${i + 1}</td>
+        <td>${(c.name || "—")} ${fav}</td>
+        <td style="direction:ltr;text-align:left">${c.handle || "—"}</td>
+        <td>${c.followers ? Number(c.followers).toLocaleString("en-US") : "—"}</td>
+        <td>${c.lastPrice ? "$" + c.lastPrice : "—"}</td>
+        <td>${c.province || "—"}</td>
+        <td style="direction:ltr;text-align:left">${c.phone || "—"}</td>
+      </tr>`;
+    }).join("");
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>قائمة الكريتورز - UGC Iraq</title>
+      <style>
+        *{font-family:'Segoe UI',Tahoma,Arial,sans-serif;box-sizing:border-box}
+        body{padding:32px;color:#1a1a1a}
+        .head{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0F9E8E;padding-bottom:16px;margin-bottom:20px}
+        .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#0F9E8E,#0A4A42);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+        h1{margin:0;font-size:22px;color:#0A4A42}
+        .sub{color:#888;font-size:13px;margin-top:2px}
+        table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
+        th{background:#0A4A42;color:#fff;padding:9px 8px;text-align:right;font-weight:700}
+        td{padding:8px;border-bottom:1px solid #eee}
+        tr:nth-child(even){background:#F7FBFA}
+        .foot{margin-top:18px;color:#aaa;font-size:11px;text-align:center}
+        @media print{body{padding:12px}}
+      </style></head><body>
+      <div class="head"><div class="logo">UGC</div><div><h1>قائمة الكريتورز</h1><div class="sub">UGC Iraq — ${list.length} كريتور — ${new Date().toLocaleDateString("ar-IQ")}</div></div></div>
+      <table><thead><tr><th>#</th><th>الاسم</th><th>الحساب</th><th>المتابعين</th><th>السعر</th><th>المحافظة</th><th>الموبايل</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="foot">UGC Iraq · ugciraq.com · @ugc.iraq</div>
+      <script>window.onload=function(){window.print()}<\/script>
+      </body></html>`);
+    win.document.close();
+  };
+
   const tier = FOLLOWER_TIERS.find((t) => t.id === followersFilter) || FOLLOWER_TIERS[0];
+  const statOf = (c) => creatorStats && creatorStats.byKey[creatorStats.norm(c.handle) || ("name:" + (c.name || "").toLowerCase().trim())];
+  const TWO_WEEKS = 14 * 24 * 60 * 60 * 1000;
   let list = db.filter((c) => {
     if (q && !((c.name || "").toLowerCase().includes(q) || (c.handle || "").toLowerCase().includes(q))) return false;
     const f = Number(c.followers) || 0;
     if (followersFilter !== "all" && !(f >= tier.min && f < tier.max)) return false;
+    if (specialFilter === "favorites") {
+      const st = statOf(c);
+      if (!st || st.campaignCount < 3) return false;
+    } else if (specialFilter === "available") {
+      // متاح = ما اشتغل وياك آخر أسبوعين
+      const st = statOf(c);
+      if (st && st.lastDate) {
+        const last = new Date(st.lastDate);
+        if (!isNaN(last) && Date.now() - last.getTime() < TWO_WEEKS) return false;
+      }
+    }
     return true;
   });
   // ترتيب
@@ -1654,6 +1948,7 @@ function DatabaseTab({ data, upd, softDelete }) {
   else if (sortBy === "followers_asc") list = [...list].sort((a, b) => (Number(a.followers) || 0) - (Number(b.followers) || 0));
   else if (sortBy === "price_desc") list = [...list].sort((a, b) => (Number(b.lastPrice) || 0) - (Number(a.lastPrice) || 0));
   else if (sortBy === "name") list = [...list].sort((a, b) => (a.name || "").localeCompare(b.name || "", "ar"));
+  else if (sortBy === "most_active") list = [...list].sort((a, b) => ((statOf(b) || {}).campaignCount || 0) - ((statOf(a) || {}).campaignCount || 0));
 
   const selCount = Object.values(selected).filter(Boolean).length;
   const toggleSel = (id) => setSelected((p) => ({ ...p, [id]: !p[id] }));
@@ -1670,7 +1965,19 @@ function DatabaseTab({ data, upd, softDelete }) {
       setTimeout(() => setMsg(""), 2500);
       return;
     }
-    const chosen = db.filter((c) => selected[c.id]);
+    let chosen = db.filter((c) => selected[c.id]);
+    // استبعد المحظورين (البلاك ليست) مع تنبيه
+    const blocked = chosen.filter((c) => isBlacklisted && isBlacklisted(c.handle, c.name));
+    if (blocked.length) {
+      const names = blocked.map((c) => c.name || c.handle).join("، ");
+      if (!window.confirm(`⚠️ في ${blocked.length} كريتور بالبلاك ليست (${names}). راح ينحذفون من الإضافة. تكمّل بالباقي؟`)) return;
+      chosen = chosen.filter((c) => !(isBlacklisted && isBlacklisted(c.handle, c.name)));
+    }
+    if (!chosen.length) {
+      setMsg("✕ كلهم بالبلاك ليست — ماكو أحد ينضاف");
+      setTimeout(() => setMsg(""), 3000);
+      return;
+    }
     const amt = Number(assign.amount) || 0;
     const newOnes = chosen.map((c) => ({
       id: "c" + Date.now() + Math.random().toString(36).slice(2, 6),
@@ -1728,6 +2035,11 @@ function DatabaseTab({ data, upd, softDelete }) {
             <button style={S.ghostBtn} onClick={() => { setSelectMode(false); clearSel(); }}>إلغاء</button>
           </>
         )}
+        <label style={S.ghostBtn}>
+          ⬆ استيراد قائمة (JSON)
+          <input type="file" accept=".json" onChange={importToDatabase} style={{ display: "none" }} />
+        </label>
+        <button style={S.ghostBtn} onClick={printDatabaseList} disabled={list.length === 0}>🖨️ تصدير PDF</button>
         {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith("\u2713") ? "#0F6E56" : "#A32D2D" }}>{msg}</span>}
       </div>
 
@@ -1740,6 +2052,10 @@ function DatabaseTab({ data, upd, softDelete }) {
             <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="رقم الموبايل (واتساب)" />
             <input style={S.input} type="number" value={form.followers} onChange={(e) => setForm({ ...form, followers: e.target.value })} placeholder="عدد المتابعين" />
             <input style={S.input} type="number" value={form.lastPrice} onChange={(e) => setForm({ ...form, lastPrice: e.target.value })} placeholder="آخر سعر (اختياري)" />
+            <input style={S.input} value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} placeholder="المحافظة (اختياري)" list="iq-provinces" />
+            <datalist id="iq-provinces">
+              {["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "كربلاء", "كركوك", "بابل", "الأنبار", "ذي قار", "ديالى", "السليمانية", "واسط", "صلاح الدين", "القادسية", "ميسان", "المثنى", "دهوك", "حلبجة"].map((p) => <option key={p} value={p} />)}
+            </datalist>
             <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -1752,6 +2068,20 @@ function DatabaseTab({ data, upd, softDelete }) {
       <div style={S.searchWrap}>
         <span style={S.searchIcon}>🔍</span>
         <input style={S.searchInput} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دور على كريتور بالاسم أو الرابط..." />
+      </div>
+
+      {/* فلتر خاص: المفضلين / المتاحين */}
+      <div style={{ ...S.dbFilterRow, background: "#FFF8F0", borderColor: "#F0DCC0" }}>
+        <span style={S.campaignFilterLabel}>عرض:</span>
+        {[
+          { id: "all", label: "الكل" },
+          { id: "favorites", label: "⭐ المفضّلين فقط" },
+          { id: "available", label: "✅ المتاحين (ما اشتغلوا مؤخراً)" },
+        ].map((t) => (
+          <button key={t.id} onClick={() => setSpecialFilter(t.id)} style={{ ...S.campChip, ...(specialFilter === t.id ? S.campChipActive : {}) }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* فلترة حسب المتابعين + ترتيب */}
@@ -1768,6 +2098,7 @@ function DatabaseTab({ data, upd, softDelete }) {
         ))}
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={S.sortSelect}>
           <option value="none">ترتيب: الافتراضي</option>
+          <option value="most_active">الأكثر تعاملاً</option>
           <option value="followers_desc">الأكثر متابعين</option>
           <option value="followers_asc">الأقل متابعين</option>
           <option value="price_desc">الأغلى سعراً</option>
@@ -1795,6 +2126,7 @@ function DatabaseTab({ data, upd, softDelete }) {
                 <th style={S.th}>الموبايل</th>
                 <th style={S.thNum}>المتابعين</th>
                 <th style={S.thNum}>آخر سعر</th>
+                <th style={S.th}>المحافظة</th>
                 <th style={S.th}>ملاحظة</th>
                 <th style={{ ...S.th, width: 90 }}></th>
               </tr>
@@ -1808,7 +2140,21 @@ function DatabaseTab({ data, upd, softDelete }) {
                     </td>
                   )}
                   <td style={S.td}>
-                    <div style={S.cName}>{c.name || "—"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={S.cName}>{c.name || "—"}</span>
+                      {(() => {
+                        const st = creatorStats && creatorStats.byKey[creatorStats.norm(c.handle) || ("name:" + (c.name || "").toLowerCase().trim())];
+                        const bl = isBlacklisted && isBlacklisted(c.handle, c.name);
+                        return (
+                          <>
+                            {bl && <span style={S.badgeBlack} title={bl.reason || "بالبلاك ليست"}>🚫 محظور</span>}
+                            {st && st.campaignCount >= 3 && <span style={S.badgeFav} title={`اشتغل وياك ${st.campaignCount} كامبين`}>⭐ مفضّل</span>}
+                            {st && st.campaignCount === 2 && <span style={S.badgeGood} title="اشتغل وياك كامبينين">×2</span>}
+                            {st && st.thisMonthCount >= 2 && <span style={S.badgeWarn} title={`اشتغل وياك ${st.thisMonthCount} مرات هذا الشهر`}>⚠️ {st.thisMonthCount} هذا الشهر</span>}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </td>
                   <td style={S.td}>
                     {c.handle ? (
@@ -1830,10 +2176,13 @@ function DatabaseTab({ data, upd, softDelete }) {
                   </td>
                   <td style={S.tdNum}>{c.followers ? Number(c.followers).toLocaleString("en-US") : "—"}</td>
                   <td style={S.tdNum}>{c.lastPrice ? fmt(c.lastPrice) : "—"}</td>
+                  <td style={S.tdMuted}>{c.province || "—"}</td>
                   <td style={S.tdMuted}>{c.note || "—"}</td>
                   <td style={S.td}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <button style={S.iconBtn} onClick={() => setHistoryOf(c)} title="سجل الكريتور">📋</button>
                       <button style={S.iconBtn} onClick={() => startEdit(c)} title="تعديل">✎</button>
+                      <button style={S.iconBtnDanger} onClick={() => setBlForm({ name: c.name || "", handle: c.handle || "", reason: "", addedBy: "" })} title="أضف للبلاك ليست">🚫</button>
                       <button style={S.iconBtnDanger} onClick={() => removeCreator(c.id)} title="حذف">✕</button>
                     </div>
                   </td>
@@ -1867,6 +2216,94 @@ function DatabaseTab({ data, upd, softDelete }) {
             <div style={{ display: "flex", gap: 8 }}>
               <button style={S.primaryBtn} onClick={addSelectedToCampaign}>أضفهم للكامبين</button>
               <button style={S.ghostBtn} onClick={() => setShowAssign(false)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مودال سجل الكريتور — كل كامبيناته وأسعاره */}
+      {historyOf && (() => {
+        const st = creatorStats && creatorStats.byKey[creatorStats.norm(historyOf.handle) || ("name:" + (historyOf.name || "").toLowerCase().trim())];
+        const bl = isBlacklisted && isBlacklisted(historyOf.handle, historyOf.name);
+        return (
+          <div style={S.modalOverlay} onClick={() => setHistoryOf(null)}>
+            <div style={{ ...S.modalCard, maxWidth: 540 }} onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                <div style={S.panelTitle}>📋 سجل: {historyOf.name || historyOf.handle || "كريتور"}</div>
+                <button style={S.iconBtn} onClick={() => setHistoryOf(null)}>✕</button>
+              </div>
+              {historyOf.handle && (
+                <a href={toUrl(historyOf.handle)} target="_blank" rel="noopener noreferrer" style={{ ...S.cHandleLink, display: "block", marginBottom: 12 }}>{historyOf.handle}</a>
+              )}
+              {bl && <div style={{ ...S.alertRow, background: "#FCEBEA", borderColor: "#F0C8C5", marginBottom: 12 }}>🚫 هذا الكريتور بالبلاك ليست — السبب: {bl.reason || "غير مذكور"}</div>}
+
+              <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                <div style={S.statMini}><div style={S.statMiniNum}>{st ? st.campaignCount : 0}</div><div style={S.statMiniLbl}>كامبين</div></div>
+                <div style={S.statMini}><div style={S.statMiniNum}>{st ? st.thisMonthCount : 0}</div><div style={S.statMiniLbl}>هذا الشهر</div></div>
+                <div style={S.statMini}><div style={S.statMiniNum}>{st && st.prices.length ? fmt(st.prices[st.prices.length - 1].price) : (historyOf.lastPrice ? fmt(historyOf.lastPrice) : "—")}</div><div style={S.statMiniLbl}>آخر سعر</div></div>
+              </div>
+
+              {st && st.campaignCount >= 3 && <div style={{ ...S.alertRow, background: "#FFF4DC", borderColor: "#F0DCA8", marginBottom: 12 }}>⭐ كريتور مفضّل — اشتغل وياك {st.campaignCount} كامبينات. ممتاز للتعاون المتكرر.</div>}
+              {st && st.thisMonthCount >= 2 && <div style={{ ...S.alertRow, background: "#FFF0E8", borderColor: "#F0C8A8", marginBottom: 12 }}>⚠️ تنبيه إفراط — اشتغل وياك {st.thisMonthCount} مرات هذا الشهر. خفّف حتى ما يحترق تأثيره.</div>}
+
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0A4A42", margin: "8px 0" }}>الكامبينات اللي اشتغل وياها:</div>
+              {st && st.prices.length ? (
+                <div style={S.tableWrap}>
+                  <table style={S.table}>
+                    <thead><tr><th style={S.th}>الكامبين</th><th style={S.th}>السعر</th><th style={S.th}>التاريخ</th></tr></thead>
+                    <tbody>
+                      {st.prices.map((p, i) => (
+                        <tr key={i} style={S.tr}>
+                          <td style={S.td}>{p.campaign || "—"}</td>
+                          <td style={S.tdNum}>{p.price ? fmt(p.price) : "—"}</td>
+                          <td style={S.tdMuted}>{p.date || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={{ fontSize: 13, color: "#888780" }}>ماكو كامبينات مسجّلة لهذا الكريتور بعد (يطلع هنا لمن تضيفه لمدفوعات الكريتورز).</p>
+              )}
+
+              {st && st.prices.length >= 2 && (
+                <p style={{ fontSize: 12.5, color: "#888780", marginTop: 10 }}>
+                  💡 تطوّر السعر: من {fmt(st.prices[0].price)} إلى {fmt(st.prices[st.prices.length - 1].price)}
+                  {st.prices[st.prices.length - 1].price > st.prices[0].price ? " (غلا ↑)" : st.prices[st.prices.length - 1].price < st.prices[0].price ? " (رخص ↓)" : " (ثابت)"}
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* مودال إضافة للبلاك ليست */}
+      {blForm && (
+        <div style={S.modalOverlay} onClick={() => setBlForm(null)}>
+          <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.panelTitle}>🚫 أضف للبلاك ليست</div>
+            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 14px", lineHeight: 1.6 }}>
+              هذا الكريتور ما راح يُقترح بالكامبينات بعد اليوم. اكتب السبب ومنو يضيفه.
+            </p>
+            <div style={{ marginBottom: 10 }}>
+              <label style={S.fieldLabel}>الاسم</label>
+              <input style={S.input} value={blForm.name} onChange={(e) => setBlForm({ ...blForm, name: e.target.value })} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={S.fieldLabel}>الحساب</label>
+              <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={blForm.handle} onChange={(e) => setBlForm({ ...blForm, handle: e.target.value })} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label style={S.fieldLabel}>السبب</label>
+              <input style={S.input} value={blForm.reason} onChange={(e) => setBlForm({ ...blForm, reason: e.target.value })} placeholder="مثلاً: ما نشر بعد الدفع" />
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.fieldLabel}>منو يضيفه؟</label>
+              <input style={S.input} value={blForm.addedBy} onChange={(e) => setBlForm({ ...blForm, addedBy: e.target.value })} placeholder="اسمك" />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={S.dangerBtn} onClick={() => { addToBlacklist(blForm); setBlForm(null); }}>أضف للبلاك ليست</button>
+              <button style={S.ghostBtn} onClick={() => setBlForm(null)}>إلغاء</button>
             </div>
           </div>
         </div>
@@ -2877,6 +3314,93 @@ function ChatBubble({ m }) {
 }
 
 // ============================================================================
+// تبويب البلاك ليست — الكريتورز اللي تعاملهم سيّئ
+// ============================================================================
+function BlacklistTab({ data, addToBlacklist, removeFromBlacklist }) {
+  const list = data.blacklist || [];
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: "", handle: "", reason: "", addedBy: "" });
+
+  const submit = () => {
+    if (!form.name.trim() && !form.handle.trim()) return;
+    addToBlacklist(form);
+    setForm({ name: "", handle: "", reason: "", addedBy: "" });
+    setShowForm(false);
+  };
+  const timeAgo = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    return d.toLocaleDateString("ar-IQ");
+  };
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>🚫 البلاك ليست</SectionTitle>
+        <button style={S.dangerBtn} onClick={() => setShowForm((v) => !v)}>+ أضف للبلاك ليست</button>
+      </div>
+
+      <p style={{ fontSize: 13.5, color: "#888780", margin: "0 0 18px", lineHeight: 1.7 }}>
+        الكريتورز هنا تعاملهم كان سيّئ أو سوّوا أمور تعبانة. ما راح يُقترحون بالكامبينات، وإذا حاولت تضيفهم راح يطلعلك تحذير. كل واحد مكتوب جنبه السبب ومنو ضافه.
+      </p>
+
+      {showForm && (
+        <div style={S.panel}>
+          <div style={S.panelTitle}>إضافة كريتور للبلاك ليست</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="اسم الكريتور" />
+            <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} placeholder="الرابط أو @username" />
+            <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="السبب (مثلاً: ما نشر بعد الدفع، تعامل غير محترم...)" />
+            <input style={S.input} value={form.addedBy} onChange={(e) => setForm({ ...form, addedBy: e.target.value })} placeholder="منو يضيفه؟ (اسمك)" />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={S.dangerBtn} onClick={submit}>أضف للبلاك ليست</button>
+            <button style={S.ghostBtn} onClick={() => { setShowForm(false); setForm({ name: "", handle: "", reason: "", addedBy: "" }); }}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {list.length === 0 ? (
+        <div style={S.emptyState}>البلاك ليست فارغة — ماكو أحد محظور.</div>
+      ) : (
+        <div style={S.tableWrap}>
+          <table style={S.table}>
+            <thead>
+              <tr>
+                <th style={S.th}>الاسم</th>
+                <th style={S.th}>الحساب</th>
+                <th style={S.th}>السبب</th>
+                <th style={S.th}>أضافه</th>
+                <th style={S.th}>التاريخ</th>
+                <th style={{ ...S.th, width: 70 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((b) => (
+                <tr key={b.id} style={S.tr}>
+                  <td style={S.td}><div style={{ ...S.cName, color: "#A32D2D" }}>{b.name || "—"}</div></td>
+                  <td style={S.td}>
+                    {b.handle ? (
+                      <a href={toUrl(b.handle)} target="_blank" rel="noopener noreferrer" style={{ ...S.cHandleLink, color: "#A32D2D" }}>{b.handle}</a>
+                    ) : "—"}
+                  </td>
+                  <td style={S.tdMuted}>{b.reason || "—"}</td>
+                  <td style={S.tdMuted}>{b.addedBy || "—"}</td>
+                  <td style={S.tdMuted}>{timeAgo(b.addedAt)}</td>
+                  <td style={S.td}>
+                    <button style={S.iconBtn} onClick={() => { if (window.confirm("شيله من البلاك ليست؟")) removeFromBlacklist(b.id); }} title="شيل من البلاك ليست">↩</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // تبويب سلة المحذوفات — استرجاع أو حذف نهائي
 // ============================================================================
 function TrashTab({ data, restoreFromTrash, purgeFromTrash, emptyTrash }) {
@@ -3469,9 +3993,17 @@ const S = {
   smartAlertWarn: { background: "#FAEEDA", border: "1px solid #F0CF9A", color: "#854F0B" },
   smartAlertInfo: { background: "#E9F3FB", border: "1px solid #C3DEF2", color: "#1F5A86" },
   statMiniGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginTop: 12 },
-  statMini: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 12, padding: "16px 18px", textAlign: "center" },
+  statMini: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 12, padding: "16px 18px", textAlign: "center", minWidth: 90 },
   statMiniVal: { fontSize: 21, fontWeight: 800, color: "#0A4A42", fontVariantNumeric: "tabular-nums" },
+  statMiniNum: { fontSize: 21, fontWeight: 800, color: "#0A4A42", fontVariantNumeric: "tabular-nums" },
   statMiniLbl: { fontSize: 12, color: "#888780", marginTop: 4 },
+
+  // شارات الكريتورز (مفضل / إفراط / محظور)
+  badgeFav: { fontSize: 11, fontWeight: 800, color: "#9A6B00", background: "#FFF2CF", border: "1px solid #F0DCA0", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
+  badgeGood: { fontSize: 11, fontWeight: 800, color: "#0F6E56", background: "#E1F5F0", border: "1px solid #BEE6DD", borderRadius: 20, padding: "2px 8px", whiteSpace: "nowrap" },
+  badgeWarn: { fontSize: 11, fontWeight: 800, color: "#B5651D", background: "#FFE9DC", border: "1px solid #F0C8A8", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
+  badgeBlack: { fontSize: 11, fontWeight: 800, color: "#fff", background: "#A32D2D", border: "1px solid #8A2424", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
+  alertRow: { fontSize: 13, fontWeight: 600, color: "#5A4A2A", background: "#FFF8E8", border: "1px solid #F0E0B8", borderRadius: 10, padding: "10px 14px", lineHeight: 1.6 },
 
   // tables
   tableWrap: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, overflowX: "auto", overflowY: "hidden" },
