@@ -40,6 +40,16 @@ const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
 const PIN = "2024"; // كلمة سر الادمنز — تكدر تغيرها بأي وقت
 
+// حسابات الموظفين — كل واحد عنده يوزر ورمز دخول خاص + كامبيناته
+// الموظفون يشوفون كلشي (مدفوعات الكريتورز، القاعدة، الكامبينات) عدا أرباح UGC والتوزيع
+const STAFF = [
+  { user: "shahad", name: "شهد ليث", code: "SH1422", campaigns: ["دار الاعرجي ملزمة", "Honor 600"] },
+  { user: "taha", name: "طه", code: "TA3380", campaigns: ["فانيلا ترند", "بابا روتي"] },
+  { user: "mustafa", name: "مصطفى", code: "MU7715", campaigns: ["سبنيس", "صيدلية"] },
+  { user: "rafal", name: "رفل احمد", code: "RA9026", campaigns: ["توترز"] },
+  { user: "damar", name: "دمار", code: "DA6191", campaigns: ["Honor 600"] },
+];
+
 // ---- أدوات مساعدة ----------------------------------------------------------
 const fmt = (n) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(
@@ -131,6 +141,7 @@ const EMPTY = {
   blacklist: [], // البلاك ليست: {id, name, handle, reason, addedBy, addedAt}
   expenses: [], // {id, label, amount, type:'company'|'personal', date, note}
   trash: [], // سلة المحذوفات: {trashId, kind:'creator'|'creatorDB'|'campaign'|'expense', item, deletedAt}
+  tasks: [], // تاسكات الموظفين: {id, user, text, campaign, done, at}
   capital: 0, // رأس مال / رصيد الشركة الابتدائي
   serverUrl: "", // رابط الخادم الوسيط لقراءة Google Sheets (اختياري)
   conversations: [], // محادثات المساعد: {id, title, messages:[], apiHistory:[], model, createdAt}
@@ -166,6 +177,8 @@ function App() {
   const [authed, setAuthed] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null); // null=أدمن، أو كائن الموظف
+  const isStaff = !!currentUser; // موظف = صلاحيات محدودة (ما يشوف أرباح UGC)
 
   const [data, setData] = useState(EMPTY);
   const [loaded, setLoaded] = useState(false);
@@ -444,39 +457,35 @@ function App() {
 
   // ---- شاشة الدخول ---------------------------------------------------------
   if (!authed) {
+    // يتحقق من رمز الأدمن أو رمز أي موظف
+    const tryLogin = () => {
+      const code = pinInput.trim();
+      if (code === PIN) { setCurrentUser(null); setAuthed(true); return; }
+      const staff = STAFF.find((s) => s.code.toLowerCase() === code.toLowerCase() || s.user.toLowerCase() === code.toLowerCase());
+      if (staff) { setCurrentUser(staff); setAuthed(true); return; }
+      setPinErr(true);
+    };
     return (
       <Shell>
         <div style={S.lockWrap}>
           <div style={S.lockCard}>
             <div style={S.lockIcon}>🔒</div>
             <h1 style={S.lockTitle}>UGC Iraq — مالية</h1>
-            <p style={S.lockSub}>منطقة الادمنز فقط. أدخل كلمة السر للمتابعة.</p>
+            <p style={S.lockSub}>أدخل رمز الدخول الخاص بك للمتابعة.</p>
             <input
               type="password"
-              inputMode="numeric"
               value={pinInput}
               onChange={(e) => {
                 setPinInput(e.target.value);
                 setPinErr(false);
               }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  if (pinInput === PIN) setAuthed(true);
-                  else setPinErr(true);
-                }
-              }}
-              placeholder="••••"
+              onKeyDown={(e) => { if (e.key === "Enter") tryLogin(); }}
+              placeholder="رمز الدخول"
               style={{ ...S.lockInput, borderColor: pinErr ? "#E24B4A" : "#D3D1C7" }}
               autoFocus
             />
-            {pinErr && <div style={S.lockErr}>كلمة السر غلط</div>}
-            <button
-              style={S.lockBtn}
-              onClick={() => {
-                if (pinInput === PIN) setAuthed(true);
-                else setPinErr(true);
-              }}
-            >
+            {pinErr && <div style={S.lockErr}>رمز الدخول غلط</div>}
+            <button style={S.lockBtn} onClick={tryLogin}>
               دخول
             </button>
           </div>
@@ -496,17 +505,28 @@ function App() {
   }
 
   // ---- الواجهة الرئيسية -----------------------------------------------------
-  const tabs = [
-    { id: "overview", label: "نظرة عامة", icon: "📊" },
+  const allTabs = [
+    { id: "overview", label: "نظرة عامة", icon: "📊", adminOnly: true },
     { id: "creators", label: "مدفوعات الكريتورز", icon: "🎬" },
     { id: "database", label: "قاعدة الكريتورز", icon: "📇" },
+    { id: "tasks", label: "تاسكاتي", icon: "✅", staffOnly: true },
     { id: "chat", label: "المساعد الذكي", icon: "🤖" },
-    { id: "campaigns", label: "الكامبينات والأرباح", icon: "📈" },
-    { id: "expenses", label: "الصرفيات", icon: "💸" },
+    { id: "campaigns", label: "الكامبينات والأرباح", icon: "📈", adminOnly: true },
+    { id: "expenses", label: "الصرفيات", icon: "💸", adminOnly: true },
     { id: "blacklist", label: "بلاك ليست", icon: "🚫" },
     { id: "trash", label: "سلة المحذوفات", icon: "🗑️" },
-    { id: "settings", label: "إعدادات", icon: "⚙️" },
+    { id: "settings", label: "إعدادات", icon: "⚙️", adminOnly: true },
   ];
+  // الموظف ما يشوف التبويبات الإدارية (الأرباح، الصرفيات، الإعدادات، النظرة العامة المالية)
+  const tabs = allTabs.filter((t) => {
+    if (t.adminOnly && isStaff) return false;
+    if (t.staffOnly && !isStaff) return false;
+    return true;
+  });
+  // لو الموظف على تبويب ممنوع، رجّعه لمدفوعات الكريتورز
+  if (isStaff && !tabs.find((t) => t.id === tab)) {
+    if (tab !== "creators") setTimeout(() => setTab("creators"), 0);
+  }
 
   return (
     <Shell>
@@ -517,12 +537,12 @@ function App() {
             <div style={S.brandMark}>UGC</div>
             <div>
               <div style={S.brandName}>المالية الداخلية</div>
-              <div style={S.brandSub}>UGC Iraq</div>
+              <div style={S.brandSub}>{isStaff ? `${currentUser.name} — موظف` : "UGC Iraq"}</div>
             </div>
           </div>
           <div style={S.headerRight}>
             <SaveBadge state={saveState} />
-            <button style={S.logoutBtn} onClick={() => setAuthed(false)}>
+            <button style={S.logoutBtn} onClick={() => { setAuthed(false); setCurrentUser(null); setPinInput(""); }}>
               قفل
             </button>
           </div>
@@ -546,25 +566,26 @@ function App() {
         </nav>
 
         <main style={S.main}>
-          {tab === "overview" && (
+          {tab === "overview" && !isStaff && (
             <Overview calc={calc} partnerTotals={partnerTotals} data={data} creatorStats={creatorStats} />
           )}
           {tab === "creators" && (
-            <CreatorsTab data={data} upd={upd} calc={calc} softDelete={softDelete} creatorStats={creatorStats} isBlacklisted={isBlacklisted} addToBlacklist={addToBlacklist} />
+            <CreatorsTab data={data} upd={upd} calc={calc} softDelete={softDelete} creatorStats={creatorStats} isBlacklisted={isBlacklisted} addToBlacklist={addToBlacklist} isStaff={isStaff} currentUser={currentUser} />
           )}
           {tab === "database" && <DatabaseTab data={data} upd={upd} softDelete={softDelete} creatorStats={creatorStats} isBlacklisted={isBlacklisted} addToBlacklist={addToBlacklist} />}
+          {tab === "tasks" && isStaff && <TasksTab data={data} upd={upd} currentUser={currentUser} />}
           {tab === "chat" && <ChatTab data={data} upd={upd} softDelete={softDelete} />}
-          {tab === "campaigns" && (
+          {tab === "campaigns" && !isStaff && (
             <CampaignsTab data={data} upd={upd} partnerTotals={partnerTotals} softDelete={softDelete} />
           )}
-          {tab === "expenses" && <ExpensesTab data={data} upd={upd} calc={calc} softDelete={softDelete} />}
+          {tab === "expenses" && !isStaff && <ExpensesTab data={data} upd={upd} calc={calc} softDelete={softDelete} />}
           {tab === "blacklist" && (
             <BlacklistTab data={data} addToBlacklist={addToBlacklist} removeFromBlacklist={removeFromBlacklist} />
           )}
           {tab === "trash" && (
             <TrashTab data={data} restoreFromTrash={restoreFromTrash} purgeFromTrash={purgeFromTrash} emptyTrash={emptyTrash} />
           )}
-          {tab === "settings" && (
+          {tab === "settings" && !isStaff && (
             <SettingsTab data={data} setData={setData} upd={upd} />
           )}
         </main>
@@ -824,9 +845,87 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
 }
 
 // ============================================================================
+// تبويب التاسكات للموظف
+// ============================================================================
+function TasksTab({ data, upd, currentUser }) {
+  const myCampaigns = currentUser.campaigns || [];
+  const tasks = (data.tasks || []).filter((t) => t.user === currentUser.user);
+  const [newTask, setNewTask] = useState("");
+  const [newTaskCamp, setNewTaskCamp] = useState(myCampaigns[0] || "");
+
+  const addTask = () => {
+    if (!newTask.trim()) return;
+    upd((d) => {
+      d.tasks = d.tasks || [];
+      d.tasks.unshift({ id: "t" + Date.now(), user: currentUser.user, text: newTask.trim(), campaign: newTaskCamp, done: false, at: Date.now() });
+      return d;
+    });
+    setNewTask("");
+  };
+  const toggleTask = (id) => upd((d) => { const t = (d.tasks || []).find((x) => x.id === id); if (t) t.done = !t.done; return d; });
+  const delTask = (id) => upd((d) => { d.tasks = (d.tasks || []).filter((x) => x.id !== id); return d; });
+
+  const campStats = myCampaigns.map((cn) => {
+    const creators = data.creators.filter((c) => (c.campaign || "") === cn);
+    return { name: cn, count: creators.length, due: creators.reduce((s, c) => s + (Number(c.amount) || 0), 0) };
+  });
+
+  return (
+    <div>
+      <SectionTitle>أهلاً {currentUser.name} 👋</SectionTitle>
+
+      <div style={S.panel}>
+        <div style={S.panelTitle}>📋 الكامبينات المسؤول عنها</div>
+        {myCampaigns.length === 0 ? (
+          <Empty text="ماكو كامبينات مخصصة لك بعد." />
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 10 }}>
+            {campStats.map((c) => (
+              <div key={c.name} style={{ background: "#F2FBF9", border: "1px solid #D6F0EA", borderRadius: 12, padding: 14 }}>
+                <div style={{ fontWeight: 800, color: "#0A4A42", fontSize: 15, marginBottom: 6 }}>{c.name}</div>
+                <div style={{ fontSize: 13, color: "#555" }}>{c.count} كريتور · مستحق ${fmt(c.due)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={S.panel}>
+        <div style={S.panelTitle}>✅ تاسكاتي</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 14, flexWrap: "wrap" }}>
+          <input style={{ ...S.input, flex: 1, minWidth: 200 }} value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTask()} placeholder="اكتب تاسك جديد..." />
+          {myCampaigns.length > 0 && (
+            <select style={{ ...S.input, maxWidth: 180 }} value={newTaskCamp} onChange={(e) => setNewTaskCamp(e.target.value)}>
+              {myCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          <button style={S.primaryBtn} onClick={addTask}>+ أضف</button>
+        </div>
+        {tasks.length === 0 ? (
+          <Empty text="ماكو تاسكات بعد. أضف أول واحد فوق." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {tasks.map((t) => (
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.done ? "#F0F7F0" : "#fff", border: "1px solid #EBE9E1", borderRadius: 10 }}>
+                <input type="checkbox" checked={t.done} onChange={() => toggleTask(t.id)} style={{ width: 18, height: 18, cursor: "pointer" }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: 14, textDecoration: t.done ? "line-through" : "none", color: t.done ? "#999" : "#1a1a1a" }}>{t.text}</span>
+                  {t.campaign && <span style={{ marginRight: 8, fontSize: 11, background: "#E1F5F2", color: "#0A4A42", padding: "2px 8px", borderRadius: 20 }}>{t.campaign}</span>}
+                </div>
+                <button style={S.iconBtnDanger} onClick={() => delTask(t.id)} title="حذف">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // تبويب مدفوعات الكريتورز
 // ============================================================================
-function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addToBlacklist }) {
+function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addToBlacklist, isStaff, currentUser }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
@@ -854,8 +953,8 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     const ps = statusOf(c);
     const pub = c.pubStatus === "published";
     const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
-    // تصفية الكامبين
-    if (campaignFilter !== "all" && (c.campaign || "") !== campaignFilter) return false;
+    // تصفية الكامبين (مع تطبيع الفراغات حتى نتجنب اختلاف بسيط بالاسم)
+    if (campaignFilter !== "all" && (c.campaign || "").trim() !== campaignFilter.trim()) return false;
     let passFilter = true;
     if (filter === "all") passFilter = true;
     else if (filter === "published") passFilter = pub;
@@ -1074,6 +1173,18 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     else alert("المتصفح منع فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة وجرّب مرة ثانية.");
   };
 
+  const setPayStatus = (id, val) =>
+    upd((d) => {
+      const i = d.creators.findIndex((x) => x.id === id);
+      if (i >= 0) {
+        d.creators[i].payStatus = val;
+        // لو صار مدفوع، اجعل المدفوع = المستحق؛ لو رجع غير مدفوع، صفّر المدفوع
+        if (val === "paid") d.creators[i].paid = d.creators[i].amount;
+        else if (val === "unpaid") d.creators[i].paid = 0;
+      }
+      return d;
+    });
+
   const setPubStatus = (id, val) =>
     upd((d) => {
       const i = d.creators.findIndex((x) => x.id === id);
@@ -1106,6 +1217,22 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       return d;
     });
 
+  // تصفير كل الدفعات: يمسح كل سجلات مدفوعات الكريتورز (مع نسخة بسلة المحذوفات احتياطاً)
+  const clearAllPayments = () => {
+    const count = data.creators.length;
+    if (count === 0) { setImportMsg("ماكو دفعات لتصفيرها"); setTimeout(() => setImportMsg(""), 3000); return; }
+    if (!window.confirm(`متأكد تريد تصفير كل المدفوعات؟ راح تنمسح ${count} سجل دفعة.\n\nملاحظة: قاعدة الكريتورز والكامبينات ما تتأثر — بس سجلات المدفوعات تنمسح.`)) return;
+    upd((d) => {
+      // احفظ نسخة بالسلة احتياطاً
+      d.trash = d.trash || [];
+      d.trash.unshift({ id: "bulk" + Date.now(), kind: "bulkCreators", label: `تصفير ${count} دفعة`, items: d.creators.slice(), at: Date.now() });
+      d.creators = [];
+      return d;
+    });
+    setImportMsg(`✓ تم تصفير ${count} دفعة (محفوظة بالسلة احتياطاً)`);
+    setTimeout(() => setImportMsg(""), 6000);
+  };
+
   return (
     <div>
       <div style={S.tabHead}>
@@ -1116,6 +1243,9 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             📥 استيراد كريتورز الكامبينات
             <input type="file" accept=".json" onChange={importCampaignCreators} style={{ display: "none" }} />
           </label>
+          <button style={{ ...S.ghostBtn, color: "#A32D2D", borderColor: "#E8C4C4", display: isStaff ? "none" : undefined }} onClick={clearAllPayments} title="يمسح كل سجلات المدفوعات (القاعدة والكامبينات ما تتأثر)">
+            🗑️ تصفير كل الدفعات
+          </button>
           <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
             + كريتور جديد
           </button>
