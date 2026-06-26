@@ -179,14 +179,14 @@ function App() {
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
   const [currentUser, setCurrentUser] = useState(null); // null=الأدمن الرئيسي، أو كائن الموظف
-  // قائمة الموظفين من البيانات (أو الافتراضية)
+
+  const [data, setData] = useState(EMPTY);
+  const [loaded, setLoaded] = useState(false);
+  // قائمة الموظفين من البيانات (أو الافتراضية) — لازم بعد تعريف data
   const staffList = (data.staff && data.staff.length) ? data.staff : DEFAULT_STAFF;
   // هل المستخدم الحالي موظف بصلاحية محدودة؟ (الأدمن الرئيسي والموظف-أدمن يشوفون كلشي)
   const isFullAdmin = !currentUser || currentUser.role === "admin"; // يشوف الأرباح والإعدادات
   const isStaff = !!currentUser && currentUser.role !== "admin"; // صلاحية محدودة
-
-  const [data, setData] = useState(EMPTY);
-  const [loaded, setLoaded] = useState(false);
   const [tab, setTab] = useState("overview");
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
 
