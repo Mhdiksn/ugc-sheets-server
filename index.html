@@ -2612,7 +2612,7 @@ root.render(React.createElement(App));
     }
     var source = document.getElementById("app-source").textContent;
     var out = Babel.transform(source, {
-      presets: ["react"],
+      presets: [["react", { runtime: "classic" }]],
       sourceType: "script"
     }).code;
     var run = new Function(out);
