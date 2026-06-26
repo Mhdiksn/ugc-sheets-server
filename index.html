@@ -100,7 +100,29 @@ const EMPTY = {
   expenses: [], // {id, label, amount, type:'company'|'personal', date, note}
   capital: 0, // رأس مال / رصيد الشركة الابتدائي
   serverUrl: "", // رابط الخادم الوسيط لقراءة Google Sheets (اختياري)
+  conversations: [], // محادثات المساعد: {id, title, messages:[], apiHistory:[], model, createdAt}
+  activeConvId: null, // المحادثة المفتوحة حالياً
+  defaultModel: "claude-sonnet-4-6", // الموديل الافتراضي للمحادثات الجديدة
 };
+
+// الموديلات المتوفرة عن طريق الـ API
+const MODELS = [
+  { id: "claude-opus-4-6", name: "Opus", desc: "الأقوى والأذكى — للمهام المعقّدة", badge: "أقوى" },
+  { id: "claude-sonnet-4-6", name: "Sonnet", desc: "متوازن — ذكي وسريع (موصى به)", badge: "متوازن" },
+  { id: "claude-haiku-4-5-20251001", name: "Haiku", desc: "الأسرع والأرخص — للمهام البسيطة", badge: "أسرع" },
+];
+
+const WELCOME_TEXT =
+  "هلا! آني مساعدك الذكي لكل شي بالتطبيق. تكدر تحجي وياي عادي وآني أسوي:\n\n• أضيف كريتور جديد وأملّي بياناته (روابط، أرقام، سوبر كي، سعر) من كلامك\n• أعدّل أي كريتور أو كامبين أو صرفية موجودة\n• أسجّل دفعات — تكتبلي أو تلصق سكرين شوت التحويل من Super Qi\n• أقرا شيت كامبين من رابط Google Sheets منشور، أحسب التكلفة من المعتمدين بس، وأضيفها للصرفيات والكريتورز تلقائياً\n• أجاوبك: «شكد الباقي على سارة؟» «منو ماخذ فلوس؟» «شكد ربحت هالشهر؟»\n\nجرّب: دزلي رابط شيت كامبين منشور، أو گلي «أضف كريتور اسمه أحمد سوبر كي 12345 سعره 50 ألف»، أو الصق صورة تحويل.";
+
+const newConversation = (model) => ({
+  id: "c" + Date.now() + Math.random().toString(36).slice(2, 7),
+  title: "محادثة جديدة",
+  messages: [{ role: "ai", type: "text", text: WELCOME_TEXT }],
+  apiHistory: [],
+  model: model || "claude-sonnet-4-6",
+  createdAt: Date.now(),
+});
 
 // ============================================================================
 // المكوّن الرئيسي
@@ -1118,29 +1140,82 @@ function ExpenseForm({ rec, onSave, onCancel }) {
 // تبويب المساعد الذكي — يقرا سكرين شوت التحويل ويسجّل الدفعة
 // ============================================================================
 function ChatTab({ data, upd }) {
-  const [messages, setMessages] = useState([
-    {
-      role: "ai",
-      type: "text",
-      text:
-        "هلا! آني مساعدك الذكي لكل شي بالتطبيق. تكدر تحجي وياي عادي وآني أسوي:\n\n• أضيف كريتور جديد وأملّي بياناته (روابط، أرقام، سوبر كي، سعر) من كلامك\n• أعدّل أي كريتور أو كامبين أو صرفية موجودة\n• أسجّل دفعات — تكتبلي أو تلصق سكرين شوت التحويل من Super Qi\n• أقرا شيت كامبين من رابط Google Sheets منشور، أحسب التكلفة من المعتمدين بس، وأضيفها للصرفيات والكريتورز تلقائياً\n• أجاوبك: «شكد الباقي على سارة؟» «منو ماخذ فلوس؟» «شكد ربحت هالشهر؟»\n\nجرّب: دزلي رابط شيت كامبين منشور، أو گلي «أضف كريتور اسمه أحمد سوبر كي 12345 سعره 50 ألف»، أو الصق صورة تحويل.",
-    },
-  ]);
+  // ---- إدارة المحادثات (محفوظة دائماً) ----
+  const conversations = data.conversations && data.conversations.length ? data.conversations : [];
+  // تأكد من وجود محادثة نشطة
+  React.useEffect(() => {
+    if (!conversations.length) {
+      const c = newConversation(data.defaultModel);
+      upd((d) => {
+        d.conversations = [c];
+        d.activeConvId = c.id;
+        return d;
+      });
+    } else if (!data.activeConvId || !conversations.find((c) => c.id === data.activeConvId)) {
+      const firstId = conversations[0].id;
+      upd((d) => {
+        d.activeConvId = firstId;
+        return d;
+      });
+    }
+    // eslint-disable-next-line
+  }, [conversations.length, data.activeConvId]);
+
+  const activeConv = conversations.find((c) => c.id === data.activeConvId) || conversations[0] || null;
+  const messages = activeConv ? activeConv.messages : [{ role: "ai", type: "text", text: WELCOME_TEXT }];
+  const curModel = activeConv ? activeConv.model : data.defaultModel;
+
   const [busy, setBusy] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [pendingImg, setPendingImg] = useState(null);
   const [pendingCsv, setPendingCsv] = useState(null); // {name, text} ملف CSV مرفوع
   const [publishReminder, setPublishReminder] = useState(null); // {url} بعد معالجة شيت — تذكير بإغلاق النشر
+  const [showConvList, setShowConvList] = useState(false); // إظهار قائمة المحادثات
+  const [showModels, setShowModels] = useState(false); // إظهار قائمة الموديلات
   const scrollRef = React.useRef(null);
   const fileRef = React.useRef(null);
   const taRef = React.useRef(null);
-  const apiHistoryRef = React.useRef([]);
+
+  // مساعدات تعديل المحادثة النشطة (تحفظ دائماً عبر upd)
+  const patchActive = (fn) => {
+    upd((d) => {
+      const conv = (d.conversations || []).find((c) => c.id === d.activeConvId);
+      if (conv) fn(conv);
+      return d;
+    });
+  };
+  const addMsg = (m) => patchActive((conv) => { conv.messages = [...conv.messages, m]; });
+  const pushApi = (entry) => patchActive((conv) => { conv.apiHistory = [...conv.apiHistory, entry]; });
+
+  const startNewConversation = () => {
+    const c = newConversation(curModel || data.defaultModel);
+    upd((d) => {
+      d.conversations = [c, ...(d.conversations || [])];
+      d.activeConvId = c.id;
+      return d;
+    });
+    setShowConvList(false);
+  };
+  const switchConversation = (id) => {
+    upd((d) => { d.activeConvId = id; return d; });
+    setShowConvList(false);
+  };
+  const deleteConversation = (id) => {
+    upd((d) => {
+      d.conversations = (d.conversations || []).filter((c) => c.id !== id);
+      if (d.activeConvId === id) d.activeConvId = d.conversations[0] ? d.conversations[0].id : null;
+      return d;
+    });
+  };
+  const setModel = (modelId) => {
+    patchActive((conv) => { conv.model = modelId; });
+    upd((d) => { d.defaultModel = modelId; return d; });
+    setShowModels(false);
+  };
 
   React.useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages, busy]);
-
-  const addMsg = (m) => setMessages((p) => [...p, m]);
 
   React.useEffect(() => {
     const onPaste = async (e) => {
@@ -1685,7 +1760,14 @@ ${JSON.stringify(buildContext())}
     }
     content.push({ type: "text", text: userText });
 
-    apiHistoryRef.current.push({ role: "user", content });
+    // سجل المحادثة السابق + رسالة المستخدم الجديدة (نمرّره لـ runConversation)
+    const seedHistory = [...(activeConv ? activeConv.apiHistory : []), { role: "user", content }];
+    pushApi({ role: "user", content });
+    // عنونة المحادثة تلقائياً من أول رسالة للمستخدم
+    if (txt && activeConv && (activeConv.title === "محادثة جديدة" || !activeConv.title)) {
+      const newTitle = txt.slice(0, 40) + (txt.length > 40 ? "…" : "");
+      patchActive((conv) => { conv.title = newTitle; });
+    }
 
     setTextInput("");
     setPendingImg(null);
@@ -1694,7 +1776,7 @@ ${JSON.stringify(buildContext())}
     setBusy(true);
 
     try {
-      await runConversation();
+      await runConversation(seedHistory);
       // إذا عالجنا شيت من رابط بنجاح، ذكّر المستخدم يسكّر النشر (مو للملف المرفوع)
       if (sheetCsv && sheetUrl) {
         setPublishReminder({ url: sheetUrl });
@@ -1705,13 +1787,17 @@ ${JSON.stringify(buildContext())}
     setBusy(false);
   };
 
-  const runConversation = async () => {
+  const runConversation = async (seedHistory) => {
     // نحسب عنوان الخادم: serverUrl إذا مضبوط، وإلا نفس الموقع (التطبيق منشور مع الخادم)
     let apiBase = (data.serverUrl || "").trim().replace(/\/+$/, "");
     if (!apiBase && typeof window !== "undefined" && window.location && window.location.origin.startsWith("http")) {
       apiBase = window.location.origin;
     }
     const claudeEndpoint = apiBase ? `${apiBase}/claude` : "/claude";
+    const modelToUse = (activeConv && activeConv.model) || data.defaultModel || "claude-sonnet-4-6";
+
+    // نسخة عمل محلية من سجل المحادثة (تبدي بالسجل السابق + رسالة المستخدم الجديدة)
+    let history = seedHistory.slice();
 
     let guard = 0;
     while (guard++ < 10) {
@@ -1719,11 +1805,11 @@ ${JSON.stringify(buildContext())}
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: modelToUse,
           max_tokens: 4000,
           system: SYSTEM(),
           tools,
-          messages: apiHistoryRef.current,
+          messages: history,
         }),
       });
       const json = await resp.json();
@@ -1736,16 +1822,21 @@ ${JSON.stringify(buildContext())}
             ? "الخادم ما عنده مفتاح API. تأكد إنك ضفت ANTHROPIC_API_KEY بإعدادات Render (Environment)."
             : "ما گدرت أكمّل الطلب. " + (errDetail ? "(" + errDetail + ") " : "") + "جرّب مرة ثانية.",
         });
+        // احفظ السجل لحد هنا
+        patchActive((conv) => { conv.apiHistory = history; });
         return;
       }
 
       const textBlocks = json.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
       if (textBlocks) addMsg({ role: "ai", type: "text", text: textBlocks });
 
-      apiHistoryRef.current.push({ role: "assistant", content: json.content });
+      history.push({ role: "assistant", content: json.content });
 
       const toolUses = json.content.filter((b) => b.type === "tool_use");
-      if (toolUses.length === 0) return;
+      if (toolUses.length === 0) {
+        patchActive((conv) => { conv.apiHistory = history; });
+        return;
+      }
 
       const toolResults = [];
       for (const tu of toolUses) {
@@ -1753,8 +1844,10 @@ ${JSON.stringify(buildContext())}
         addMsg({ role: "ai", type: "action", tool: tu.name, text: out });
         toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: out });
       }
-      apiHistoryRef.current.push({ role: "user", content: toolResults });
+      history.push({ role: "user", content: toolResults });
     }
+    // وصلنا للحد الأقصى — احفظ السجل
+    patchActive((conv) => { conv.apiHistory = history; });
   };
 
   const onKeyDown = (e) => {
@@ -1778,9 +1871,66 @@ ${JSON.stringify(buildContext())}
 
   return (
     <div>
-      <div style={S.tabHead}>
-        <SectionTitle noMargin>المساعد الذكي</SectionTitle>
-        <span style={S.chatBadge}>يساعدك بكل شي بالتطبيق</span>
+      <div style={S.chatTopBar}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <SectionTitle noMargin>المساعد الذكي</SectionTitle>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, position: "relative" }}>
+          {/* اختيار الموديل */}
+          <div style={{ position: "relative" }}>
+            <button style={S.modelBtn} onClick={() => { setShowModels((v) => !v); setShowConvList(false); }} title="اختر الموديل">
+              <span style={S.modelDot} />
+              {(MODELS.find((m) => m.id === curModel) || MODELS[1]).name}
+              <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+            </button>
+            {showModels && (
+              <div style={S.dropdown}>
+                <div style={S.dropdownTitle}>اختر الموديل لهالمحادثة</div>
+                {MODELS.map((m) => (
+                  <button key={m.id} style={{ ...S.modelItem, ...(m.id === curModel ? S.modelItemActive : {}) }} onClick={() => setModel(m.id)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontWeight: 700 }}>{m.name}</span>
+                      <span style={S.modelBadge}>{m.badge}</span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "#888780", marginTop: 2 }}>{m.desc}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* محادثة جديدة */}
+          <button style={S.newChatBtn} onClick={startNewConversation} title="محادثة جديدة">
+            + جديدة
+          </button>
+          {/* قائمة المحادثات */}
+          <button style={S.convListBtn} onClick={() => { setShowConvList((v) => !v); setShowModels(false); }} title="المحادثات">
+            ☰ {conversations.length}
+          </button>
+          {showConvList && (
+            <div style={{ ...S.dropdown, left: 0, right: "auto", minWidth: 260 }}>
+              <div style={S.dropdownTitle}>المحادثات ({conversations.length})</div>
+              <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                {conversations.map((c) => (
+                  <div key={c.id} style={{ ...S.convItem, ...(c.id === data.activeConvId ? S.convItemActive : {}) }}>
+                    <button style={S.convItemMain} onClick={() => switchConversation(c.id)}>
+                      <div style={{ fontWeight: c.id === data.activeConvId ? 700 : 500, fontSize: 13, color: "#2B2A28", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {c.title || "محادثة"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#A8A6A0" }}>
+                        {(MODELS.find((m) => m.id === c.model) || {}).name || "Sonnet"} · {c.messages.length - 1} رسالة
+                      </div>
+                    </button>
+                    {conversations.length > 1 && (
+                      <button style={S.convDelBtn} onClick={() => deleteConversation(c.id)} title="حذف">
+                        🗑
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={S.chatWindow} ref={scrollRef}>
@@ -2530,6 +2680,21 @@ const S = {
 
   // chat
   chatBadge: { fontSize: 12, color: "#0F6E56", background: "#E1F5F2", padding: "5px 12px", borderRadius: 99, border: "1px solid #9FE1D8" },
+
+  chatTopBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 },
+  modelBtn: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#0A4A42", background: "#E1F5F2", border: "1px solid #9FE1D8", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
+  modelDot: { width: 8, height: 8, borderRadius: "50%", background: "#0F9E8E", display: "inline-block" },
+  newChatBtn: { fontSize: 13, fontWeight: 700, color: "#fff", background: "#0A4A42", border: "none", borderRadius: 9, padding: "7px 14px", cursor: "pointer", fontFamily: FONT },
+  convListBtn: { fontSize: 13, fontWeight: 600, color: "#5F5E5A", background: "#F2F1ED", border: "1px solid #E0DED6", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
+  dropdown: { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E0DED6", borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,0.14)", padding: 8, zIndex: 50, minWidth: 240 },
+  dropdownTitle: { fontSize: 11, fontWeight: 700, color: "#A8A6A0", padding: "4px 8px 8px", textTransform: "uppercase", letterSpacing: 0.5 },
+  modelItem: { display: "block", width: "100%", textAlign: "right", background: "transparent", border: "none", borderRadius: 8, padding: "9px 10px", cursor: "pointer", fontFamily: FONT, marginBottom: 2 },
+  modelItemActive: { background: "#E1F5F2" },
+  modelBadge: { fontSize: 10, fontWeight: 700, color: "#0F6E56", background: "#E1F5F2", padding: "2px 8px", borderRadius: 99, border: "1px solid #BBE8E0" },
+  convItem: { display: "flex", alignItems: "center", gap: 4, borderRadius: 8, marginBottom: 2 },
+  convItemActive: { background: "#F2FBF9" },
+  convItemMain: { flex: 1, textAlign: "right", background: "transparent", border: "none", borderRadius: 8, padding: "9px 10px", cursor: "pointer", fontFamily: FONT, overflow: "hidden" },
+  convDelBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: "6px 8px", borderRadius: 6, flexShrink: 0 },
   chatWindow: { background: "#FBFAF7", border: "1px solid #EBE9E1", borderRadius: 16, padding: 18, minHeight: 360, maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 },
   aiRow: { display: "flex", gap: 10, alignItems: "flex-start" },
   aiAvatar: { width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #0F9E8E 0%, #0A4A42 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 },
