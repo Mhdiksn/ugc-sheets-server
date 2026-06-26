@@ -8,9 +8,10 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: #FBFAF7; }
   #root { min-height: 100vh; }
-  #boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; color: #0A4A42; flex-direction: column; gap: 16px; }
+  #boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; color: #0A4A42; flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
   #boot .mark { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, #0F9E8E 0%, #0A4A42 100%); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
   #boot .spin { width: 28px; height: 28px; border: 3px solid #E1F5F2; border-top-color: #0F9E8E; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
+  #boot .err { color: #A32D2D; font-size: 14px; max-width: 400px; line-height: 1.6; }
   @keyframes bootspin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -27,7 +28,8 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-<script type="text/babel">
+<!-- كود التطبيق (المتصفح يتجاهله، نحوّله يدوياً تحت) -->
+<script type="text/plain" id="app-source">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
 
@@ -2591,6 +2593,35 @@ const S = {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(React.createElement(App));
+
+</script>
+
+<!-- محوّل يدوي: يضمن التحويل الصحيح بدون مشاكل module -->
+<script>
+(function () {
+  function showError(msg) {
+    var root = document.getElementById("root");
+    if (root) {
+      root.innerHTML = '<div id="boot"><div class="mark">UGC</div><div class="err">صار خطأ بتحميل التطبيق:<br>' + msg + '<br><br>جرّب تحدّث الصفحة (Ctrl+Shift+R). إذا ضل، تأكد إن الانترنت شغّال.</div></div>';
+    }
+  }
+  try {
+    if (typeof Babel === "undefined" || typeof React === "undefined" || typeof ReactDOM === "undefined") {
+      showError("ما گدر يحمّل المكتبات من الانترنت. تأكد من اتصالك وحدّث الصفحة.");
+      return;
+    }
+    var source = document.getElementById("app-source").textContent;
+    var out = Babel.transform(source, {
+      presets: ["react"],
+      sourceType: "script"
+    }).code;
+    var run = new Function(out);
+    run();
+  } catch (e) {
+    showError((e && e.message) ? e.message : String(e));
+    console.error(e);
+  }
+})();
 </script>
 </body>
 </html>
