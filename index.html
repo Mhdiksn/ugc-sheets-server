@@ -3645,6 +3645,14 @@ function SettingsTab({ data, setData, upd }) {
     URL.revokeObjectURL(url);
   };
 
+  // وضع الاستيراد: "merge" يدمج ويتجاهل التكرار (الافتراضي)، "replace" يستبدل كلش
+  const [importMode, setImportMode] = useState("merge");
+
+  const unameKey = (h) => {
+    const m = String(h || "").match(/instagram\.com\/([\w._]+)/i) || String(h || "").match(/tiktok\.com\/@([\w._]+)/i);
+    return m ? m[1].toLowerCase() : "";
+  };
+
   const importData = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -3652,17 +3660,98 @@ function SettingsTab({ data, setData, upd }) {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(reader.result);
-        setData({ ...EMPTY, ...parsed });
-        setCap(parsed.capital || 0);
-        setSrv(parsed.serverUrl || "");
-        setMsg("✓ تم استيراد البيانات بنجاح");
-        setTimeout(() => setMsg(""), 3000);
+
+        // وضع الاستبدال الكامل (القديم)
+        if (importMode === "replace") {
+          setData({ ...EMPTY, ...parsed });
+          setCap(parsed.capital || 0);
+          setSrv(parsed.serverUrl || "");
+          setMsg("✓ تم استبدال كل البيانات بالملف");
+          setTimeout(() => setMsg(""), 4000);
+          return;
+        }
+
+        // وضع الدمج: يدمج القاعدة والمدفوعات بدون تكرار
+        setData((d) => {
+          const out = { ...d };
+
+          // --- 1) دمج قاعدة الكريتورز (creatorsDB) بدون تكرار ---
+          const inDB = Array.isArray(parsed.creatorsDB) ? parsed.creatorsDB : [];
+          const existingDB = (d.creatorsDB || []).slice();
+          const dbByKey = {};
+          existingDB.forEach((c) => {
+            const k = unameKey(c.handle) || ("name:" + (c.name || "").toLowerCase().trim());
+            if (k && k !== "name:") dbByKey[k] = c;
+          });
+          let dbAdded = 0, dbMerged = 0;
+          inDB.forEach((it) => {
+            const handle = it.handle || it.link || "";
+            const name = it.name || "";
+            const k = unameKey(handle) || ("name:" + name.toLowerCase().trim());
+            if (!k || k === "name:") return;
+            if (dbByKey[k]) {
+              const ex = dbByKey[k];
+              if ((!ex.followers || ex.followers === 0) && it.followers) ex.followers = Number(it.followers) || 0;
+              if (!ex.lastPrice && it.lastPrice) ex.lastPrice = it.lastPrice;
+              if (!ex.phone && it.phone) ex.phone = it.phone;
+              if (!ex.province && it.province) ex.province = it.province;
+              if (!ex.note && it.note) ex.note = it.note;
+              dbMerged++;
+            } else {
+              const rec = { id: "d" + Date.now() + Math.random().toString(36).slice(2, 7), name, handle, phone: it.phone || "", followers: Number(it.followers) || 0, lastPrice: it.lastPrice || "", province: it.province || "", note: it.note || "" };
+              existingDB.push(rec);
+              dbByKey[k] = rec;
+              dbAdded++;
+            }
+          });
+          out.creatorsDB = existingDB;
+
+          // --- 2) دمج المدفوعات (creators) بدون تكرار: المفتاح = حساب + كامبين ---
+          const inCr = Array.isArray(parsed.creators) ? parsed.creators : [];
+          const existingCr = (d.creators || []).slice();
+          const crSeen = new Set(existingCr.map((c) => (unameKey(c.handle) || (c.name || "").toLowerCase().trim()) + "|" + (c.campaign || "").toLowerCase().trim()));
+          let crAdded = 0;
+          inCr.forEach((it) => {
+            const key = (unameKey(it.handle) || (it.name || "").toLowerCase().trim()) + "|" + (it.campaign || "").toLowerCase().trim();
+            if (it.handle && crSeen.has(key)) return;
+            crSeen.add(key);
+            existingCr.push({ ...it, id: it.id || ("c" + Date.now() + Math.random().toString(36).slice(2, 7)) });
+            crAdded++;
+          });
+          out.creators = existingCr;
+
+          // --- 3) دمج الكامبينات والبلاك ليست والمصاريف بدون تكرار ---
+          const mergeList = (exArr, inArr, keyFn) => {
+            const res = (exArr || []).slice();
+            const seen = new Set(res.map(keyFn));
+            let added = 0;
+            (inArr || []).forEach((x) => { const k = keyFn(x); if (!seen.has(k)) { seen.add(k); res.push(x); added++; } });
+            return { res, added };
+          };
+          const campRes = mergeList(d.campaigns, parsed.campaigns, (c) => (c.name || "").toLowerCase().trim());
+          out.campaigns = campRes.res;
+          out.blacklist = mergeList(d.blacklist, parsed.blacklist, (b) => (unameKey(b.handle) || (b.name || "").toLowerCase().trim())).res;
+          out.expenses = mergeList(d.expenses, parsed.expenses, (x) => (x.id || "") + (x.note || "") + (x.amount || "")).res;
+          if (parsed.capital && !d.capital) { out.capital = parsed.capital; setCap(parsed.capital); }
+
+          window.setTimeout(() => {
+            const parts = [];
+            if (dbAdded) parts.push(`${dbAdded} كريتور جديد`);
+            if (dbMerged) parts.push(`كمّلت نواقص ${dbMerged}`);
+            if (crAdded) parts.push(`${crAdded} سجل دفعة`);
+            if (campRes.added) parts.push(`${campRes.added} كامبين`);
+            setMsg(`✓ استيراد شامل تم — ${parts.join(" · ") || "ماكو جديد، كلش موجود"} (بدون تكرار)`);
+            setTimeout(() => setMsg(""), 8000);
+          }, 50);
+          return out;
+        });
       } catch {
         setMsg("✕ الملف غير صالح");
         setTimeout(() => setMsg(""), 3000);
       }
     };
     reader.readAsText(file);
+    e.target.value = "";
   };
 
   const counts = {
@@ -3753,11 +3842,22 @@ function SettingsTab({ data, setData, upd }) {
           <div style={S.dataStat}><b>{counts.campaigns}</b> كامبين</div>
           <div style={S.dataStat}><b>{counts.expenses}</b> صرفية</div>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <button style={S.primaryBtn} onClick={exportData}>⬇ تصدير نسخة (JSON)</button>
           <label style={S.secondaryBtn}>
             ⬆ استيراد نسخة
             <input type="file" accept=".json" onChange={importData} style={{ display: "none" }} />
+          </label>
+        </div>
+        <div style={{ marginTop: 12, padding: 12, background: "#F7FBFA", borderRadius: 10, border: "1px solid #D8EFE9" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#0A4A42", marginBottom: 8 }}>طريقة الاستيراد:</div>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8, cursor: "pointer" }}>
+            <input type="radio" name="impmode" checked={importMode === "merge"} onChange={() => setImportMode("merge")} style={{ marginTop: 3 }} />
+            <span style={{ fontSize: 13, lineHeight: 1.5 }}><b>دمج شامل بدون تكرار</b> (مُوصى) — استيراد واحد يسوي كلش: يضيف الكريتورز الجداد للقاعدة، يملأ النواقص (متابعين/أرقام/أسعار/محافظات)، يضيف كل الكامبينات بتفاصيلها، ويضيف سجلات المدفوعات — كله بدون تكرار. يحتفظ ببياناتك الحالية.</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+            <input type="radio" name="impmode" checked={importMode === "replace"} onChange={() => setImportMode("replace")} style={{ marginTop: 3 }} />
+            <span style={{ fontSize: 13, lineHeight: 1.5 }}><b>استبدال كامل</b> — يمسح كل البيانات الحالية ويحطّ محلها الملف. انتبه: ما يرجع.</span>
           </label>
         </div>
         <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #EBE9E1" }}>
