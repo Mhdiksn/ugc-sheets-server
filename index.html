@@ -113,8 +113,38 @@ function pubSelectStyle(key) {
 
 // ---- التخزين الدائم --------------------------------------------------------
 const STORE_KEY = "ugc_finance_v1";
+const FB_URL_KEY = "ugc_firebase_url"; // رابط قاعدة Firebase (محفوظ محلياً حتى يكون متاح قبل تحميل الداتا)
 
+// رابط Firebase الحالي (من التخزين المحلي)
+function getFirebaseURL() {
+  try { return (localStorage.getItem(FB_URL_KEY) || "").trim().replace(/\/+$/, ""); } catch (e) { return ""; }
+}
+function setFirebaseURL(url) {
+  try {
+    const clean = (url || "").trim().replace(/\/+$/, "");
+    if (clean) localStorage.setItem(FB_URL_KEY, clean);
+    else localStorage.removeItem(FB_URL_KEY);
+  } catch (e) { /* تجاهل */ }
+}
+
+// تحميل البيانات: من Firebase إذا مفعّل، وإلا من التخزين المحلي
 async function loadAll() {
+  const fb = getFirebaseURL();
+  if (fb) {
+    try {
+      const resp = await fetch(`${fb}/ugcData.json`);
+      if (resp.ok) {
+        const remote = await resp.json();
+        if (remote && typeof remote === "object") {
+          // خزّن نسخة محلية احتياطية
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(remote)); } catch (e) {}
+          return remote;
+        }
+      }
+    } catch (e) {
+      // فشل الاتصال بالسحابة — نرجع للنسخة المحلية
+    }
+  }
   try {
     const v = localStorage.getItem(STORE_KEY);
     if (v) return JSON.parse(v);
@@ -124,13 +154,38 @@ async function loadAll() {
   return null;
 }
 
+// حفظ البيانات: للتخزين المحلي دائماً + Firebase إذا مفعّل
 async function saveAll(data) {
+  let localOk = false;
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(data));
-    return true;
-  } catch (e) {
-    return false;
+    localOk = true;
+  } catch (e) { localOk = false; }
+  const fb = getFirebaseURL();
+  if (fb) {
+    try {
+      const resp = await fetch(`${fb}/ugcData.json`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, _updatedAt: Date.now() }),
+      });
+      return resp.ok;
+    } catch (e) {
+      return localOk; // نجح محلياً على الأقل
+    }
   }
+  return localOk;
+}
+
+// جلب وقت آخر تحديث من السحابة (للمزامنة اللحظية)
+async function fetchRemoteUpdatedAt() {
+  const fb = getFirebaseURL();
+  if (!fb) return null;
+  try {
+    const resp = await fetch(`${fb}/ugcData/_updatedAt.json`);
+    if (resp.ok) return await resp.json();
+  } catch (e) {}
+  return null;
 }
 
 // ---- بيانات افتراضية فارغة -------------------------------------------------
@@ -189,6 +244,7 @@ function App() {
   const isStaff = !!currentUser && currentUser.role !== "admin"; // صلاحية محدودة
   const [tab, setTab] = useState("overview");
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved
+  const [syncMsg, setSyncMsg] = useState(""); // رسالة مزامنة Firebase
 
   // تحميل أولي
   useEffect(() => {
@@ -200,16 +256,42 @@ function App() {
   }, []);
 
   // حفظ تلقائي عند أي تغيير
+  const lastSaveAt = useRef(0);
   useEffect(() => {
     if (!loaded) return;
     setSaveState("saving");
     const t = setTimeout(async () => {
+      lastSaveAt.current = Date.now();
       await saveAll(data);
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1500);
     }, 400);
     return () => clearTimeout(t);
   }, [data, loaded]);
+
+  // مزامنة لحظية: إذا Firebase مفعّل، نفحص كل 5 ثواني إذا أكو تحديث من جهاز ثاني
+  useEffect(() => {
+    if (!loaded) return;
+    const fb = getFirebaseURL();
+    if (!fb) return;
+    let stop = false;
+    const poll = async () => {
+      if (stop) return;
+      const remoteAt = await fetchRemoteUpdatedAt();
+      // إذا التحديث البعيد أحدث من آخر حفظ سويناه إحنا بفرق محسوس، نسحب النسخة الجديدة
+      if (remoteAt && remoteAt > lastSaveAt.current + 2000) {
+        const fresh = await loadAll();
+        if (fresh && !stop) {
+          lastSaveAt.current = remoteAt; // حتى ما نعيد السحب لنفس النسخة
+          setData({ ...EMPTY, ...fresh });
+          setSyncMsg("🔄 انتحدثت البيانات من جهاز ثاني");
+          setTimeout(() => setSyncMsg(""), 3000);
+        }
+      }
+    };
+    const iv = setInterval(poll, 5000);
+    return () => { stop = true; clearInterval(iv); };
+  }, [loaded, data.serverUrl]);
 
   // نسخة احتياطية تلقائية: تنزّل ملف بيانات إذا مرّت المدة المحددة
   useEffect(() => {
@@ -316,14 +398,32 @@ function App() {
     const now = new Date();
     const thisMonth = now.getFullYear() + "-" + (now.getMonth() + 1);
     const map = {}; // key -> {name, handle, campaigns:Set, thisMonthCount, dates:[], prices:[]}
+
+    // (١) المصدر الدائم: قاعدة الكريتورز — تاريخ الكامبينات والمحافظة محفوظ هنا ولا يتأثر بتصفير الدفعات
+    (data.creatorsDB || []).forEach((c) => {
+      const key = norm(c.handle) || ("name:" + String(c.name || "").toLowerCase().trim());
+      if (!key || key === "name:") return;
+      if (!map[key]) map[key] = { name: c.name || "", handle: c.handle || "", province: c.province || "", campaigns: new Set(), thisMonthCount: 0, dates: [], prices: [], lastDate: null };
+      const e = map[key];
+      if (!e.province && c.province) e.province = c.province;
+      // قائمة الكامبينات المحفوظة بالقاعدة (إن وجدت)
+      (c.campaigns || []).forEach((cn) => { if (cn) e.campaigns.add(cn); });
+      // تاريخ الأسعار المحفوظ بالقاعدة
+      (c.priceHistory || []).forEach((ph) => {
+        if (ph && Number(ph.price) > 0) e.prices.push({ price: Number(ph.price), date: ph.date || "", campaign: ph.campaign || "" });
+      });
+    });
+
+    // (٢) المصدر الحي: المدفوعات الحالية — يضيف فوق الدائم (بدون تكرار الكامبين)
     (data.creators || []).forEach((c) => {
       const key = norm(c.handle) || ("name:" + String(c.name || "").toLowerCase().trim());
       if (!key || key === "name:") return;
-      if (!map[key]) map[key] = { name: c.name || "", handle: c.handle || "", campaigns: new Set(), thisMonthCount: 0, dates: [], prices: [], lastDate: null };
+      if (!map[key]) map[key] = { name: c.name || "", handle: c.handle || "", province: c.province || "", campaigns: new Set(), thisMonthCount: 0, dates: [], prices: [], lastDate: null };
       const e = map[key];
       if (c.campaign) e.campaigns.add(c.campaign);
       if (!e.name && c.name) e.name = c.name;
       if (!e.handle && c.handle) e.handle = c.handle;
+      if (!e.province && c.province) e.province = c.province;
       const d = c.date || "";
       if (d) {
         e.dates.push(d);
@@ -333,11 +433,12 @@ function App() {
       }
       if (Number(c.amount) > 0) e.prices.push({ price: Number(c.amount), date: d, campaign: c.campaign || "" });
     });
+
     // حوّل لكائن بمفاتيح + دوال مساعدة
     const byKey = {};
     Object.entries(map).forEach(([k, v]) => {
       byKey[k] = {
-        name: v.name, handle: v.handle,
+        name: v.name, handle: v.handle, province: v.province,
         campaignCount: v.campaigns.size,
         campaigns: Array.from(v.campaigns),
         thisMonthCount: v.thisMonthCount,
@@ -346,7 +447,7 @@ function App() {
       };
     });
     return { byKey, norm };
-  }, [data.creators]);
+  }, [data.creators, data.creatorsDB]);
 
   // ---- مُعدّلات البيانات ---------------------------------------------------
   const upd = useCallback((fn) => setData((d) => fn(structuredClone(d))), []);
@@ -547,6 +648,7 @@ function App() {
             </div>
           </div>
           <div style={S.headerRight}>
+            {syncMsg && <span style={{ fontSize: 12, color: "#0F9E8E", fontWeight: 700 }}>{syncMsg}</span>}
             <SaveBadge state={saveState} />
             <button style={S.logoutBtn} onClick={() => { setAuthed(false); setCurrentUser(null); setPinInput(""); }}>
               قفل
@@ -797,6 +899,9 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
         return (
           <div style={{ marginTop: 28 }}>
             <SectionTitle>⭐ أكثر الكريتورز تعاملاً وياك</SectionTitle>
+            <p style={{ fontSize: 12.5, color: "#A8A6A0", margin: "-8px 0 12px", lineHeight: 1.6 }}>
+              📇 مرتبط بقاعدة الكريتورز — محفوظ بشكل دائم، ما يتأثر بتصفير الدفعات
+            </p>
             <div style={S.panel}>
               {top.map((s, i) => (
                 <div key={i} style={S.barRow}>
@@ -900,12 +1005,11 @@ function TasksTab({ data, upd, currentUser }) {
         <div style={S.panelTitle}>✅ تاسكاتي</div>
         <div style={{ display: "flex", gap: 8, marginTop: 10, marginBottom: 14, flexWrap: "wrap" }}>
           <input style={{ ...S.input, flex: 1, minWidth: 200 }} value={newTask} onChange={(e) => setNewTask(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTask()} placeholder="اكتب تاسك جديد..." />
-          {myCampaigns.length > 0 && (
-            <select style={{ ...S.input, maxWidth: 180 }} value={newTaskCamp} onChange={(e) => setNewTaskCamp(e.target.value)}>
-              {myCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          )}
-          <button style={S.primaryBtn} onClick={addTask}>+ أضف</button>
+          <select style={{ ...S.input, maxWidth: 180 }} value={newTaskCamp} onChange={(e) => setNewTaskCamp(e.target.value)}>
+            <option value="">بدون كامبين</option>
+            {myCampaigns.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <button style={S.primaryBtn} onClick={addTask}>+ أضف تاسك</button>
         </div>
         {tasks.length === 0 ? (
           <Empty text="ماكو تاسكات بعد. أضف أول واحد فوق." />
@@ -1225,18 +1329,89 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     });
 
   // تصفير كل الدفعات: يمسح كل سجلات مدفوعات الكريتورز (مع نسخة بسلة المحذوفات احتياطاً)
+  // حفظ تاريخ الكامبينات والأسعار من المدفوعات إلى قاعدة الكريتورز (نظام دائم منفصل)
+  // هذا يخلّي قوائم المفضلين والتكرار والمحافظات مرتبطة بالقاعدة — ما تنمسح بتصفير الدفعات
+  const snapshotToDatabase = (silent) => {
+    const norm = (s) => {
+      const h = String(s || "").trim().toLowerCase();
+      const m = h.match(/instagram\.com\/([\w._]+)/) || h.match(/tiktok\.com\/@([\w._]+)/);
+      return m ? m[1] : h;
+    };
+    let filled = 0;
+    upd((d) => {
+      // اجمع تاريخ كل كريتور من المدفوعات
+      const hist = {};
+      (d.creators || []).forEach((c) => {
+        const k = norm(c.handle) || ("name:" + String(c.name || "").toLowerCase().trim());
+        if (!k || k === "name:") return;
+        if (!hist[k]) hist[k] = { campaigns: new Set(), prices: [], province: "", name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || 0 };
+        const e = hist[k];
+        if (c.campaign) e.campaigns.add(c.campaign);
+        if (Number(c.amount) > 0) e.prices.push({ price: Number(c.amount), date: c.date || "", campaign: c.campaign || "" });
+        const note = c.note || "";
+        if (note.includes("محافظة:") && !e.province) e.province = note.split("محافظة:")[1].trim();
+      });
+      // اكتب التاريخ بالقاعدة (دمج مع الموجود)
+      const dbByKey = {};
+      (d.creatorsDB || []).forEach((r) => {
+        const k = norm(r.handle) || ("name:" + String(r.name || "").toLowerCase().trim());
+        if (k && k !== "name:") dbByKey[k] = r;
+      });
+      Object.entries(hist).forEach(([k, e]) => {
+        if (dbByKey[k]) {
+          // ادمج الكامبينات مع الموجودة بالقاعدة
+          const existing = new Set(dbByKey[k].campaigns || []);
+          e.campaigns.forEach((cn) => existing.add(cn));
+          dbByKey[k].campaigns = Array.from(existing);
+          dbByKey[k].priceHistory = e.prices.length ? e.prices : (dbByKey[k].priceHistory || []);
+          if (!dbByKey[k].province && e.province) dbByKey[k].province = e.province;
+          if (e.campaigns.size) filled++;
+        } else {
+          // كريتور بالمدفوعات مو بالقاعدة — أضفه للقاعدة
+          d.creatorsDB = d.creatorsDB || [];
+          d.creatorsDB.push({ id: "d" + Date.now() + Math.random().toString(36).slice(2, 6), name: e.name, handle: e.handle, phone: e.phone, followers: Number(e.followers) || 0, lastPrice: e.prices.length ? e.prices[e.prices.length - 1].price : "", province: e.province, note: "", campaigns: Array.from(e.campaigns), priceHistory: e.prices });
+          if (e.campaigns.size) filled++;
+        }
+      });
+      return d;
+    });
+    if (!silent) {
+      setImportMsg(`✓ انحفظ تاريخ ${filled} كريتور بالقاعدة (المفضلين والتكرار صاروا دائمين)`);
+      setTimeout(() => setImportMsg(""), 6000);
+    }
+    return filled;
+  };
+
   const clearAllPayments = () => {
     const count = data.creators.length;
     if (count === 0) { setImportMsg("ماكو دفعات لتصفيرها"); setTimeout(() => setImportMsg(""), 3000); return; }
-    if (!window.confirm(`متأكد تريد تصفير كل المدفوعات؟ راح تنمسح ${count} سجل دفعة.\n\nملاحظة: قاعدة الكريتورز والكامبينات ما تتأثر — بس سجلات المدفوعات تنمسح.`)) return;
+    if (!window.confirm(`متأكد تريد تصفير كل المدفوعات؟ راح تنمسح ${count} سجل دفعة.\n\n✓ راح أحفظ تاريخ الكامبينات بالقاعدة أول — فقوائم المفضلين والتكرار والمحافظات ما تنمسح.\n✓ قاعدة الكريتورز والكامبينات ما تتأثر — بس سجلات المدفوعات تنمسح.`)) return;
+    // احفظ التاريخ بالقاعدة قبل المسح (حتى ما تروح قوائم المفضلين)
+    snapshotToDatabase(true);
     upd((d) => {
-      // احفظ نسخة بالسلة احتياطاً
       d.trash = d.trash || [];
       d.trash.unshift({ id: "bulk" + Date.now(), kind: "bulkCreators", label: `تصفير ${count} دفعة`, items: d.creators.slice(), at: Date.now() });
       d.creators = [];
       return d;
     });
-    setImportMsg(`✓ تم تصفير ${count} دفعة (محفوظة بالسلة احتياطاً)`);
+    setImportMsg(`✓ تم تصفير ${count} دفعة (التاريخ محفوظ بالقاعدة + نسخة بالسلة)`);
+    setTimeout(() => setImportMsg(""), 6000);
+  };
+
+  // حذف كامبين مخصص: يمسح كل سجلات هذا الكامبين + يشيله من قائمة الكامبينات (مع نسخة بالسلة)
+  const deleteCampaign = (campName) => {
+    const inCamp = data.creators.filter((c) => (c.campaign || "").trim() === campName.trim());
+    if (!window.confirm(`متأكد تريد حذف كامبين «${campName}»؟\nراح تنحذف ${inCamp.length} سجل دفعة مرتبط بيه.\n\n(محفوظة بالسلة احتياطاً — تگدر تترجعها)`)) return;
+    upd((d) => {
+      d.trash = d.trash || [];
+      if (inCamp.length) d.trash.unshift({ id: "camp" + Date.now(), kind: "bulkCreators", label: `حذف كامبين «${campName}» (${inCamp.length} سجل)`, items: inCamp.slice(), at: Date.now() });
+      d.creators = d.creators.filter((c) => (c.campaign || "").trim() !== campName.trim());
+      // شيله من قائمة الكامبينات الرسمية هم
+      d.campaigns = (d.campaigns || []).filter((c) => (c.name || "").trim() !== campName.trim());
+      return d;
+    });
+    setCampaignFilter("all");
+    setImportMsg(`✓ انحذف كامبين «${campName}» (${inCamp.length} سجل محفوظ بالسلة)`);
     setTimeout(() => setImportMsg(""), 6000);
   };
 
@@ -1250,7 +1425,10 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             📥 استيراد كريتورز الكامبينات
             <input type="file" accept=".json" onChange={importCampaignCreators} style={{ display: "none" }} />
           </label>
-          <button style={{ ...S.ghostBtn, color: "#A32D2D", borderColor: "#E8C4C4", display: isStaff ? "none" : undefined }} onClick={clearAllPayments} title="يمسح كل سجلات المدفوعات (القاعدة والكامبينات ما تتأثر)">
+          <button style={{ ...S.ghostBtn, color: "#0F6E56", borderColor: "#BCE3D9", display: isStaff ? "none" : undefined }} onClick={() => snapshotToDatabase(false)} title="يحفظ تاريخ الكامبينات بالقاعدة — فقوائم المفضلين والتكرار تصير دائمة">
+            💾 احفظ التاريخ بالقاعدة
+          </button>
+          <button style={{ ...S.ghostBtn, color: "#A32D2D", borderColor: "#E8C4C4", display: isStaff ? "none" : undefined }} onClick={clearAllPayments} title="يمسح كل سجلات المدفوعات (القاعدة والكامبينات والتاريخ ما تتأثر)">
             🗑️ تصفير كل الدفعات
           </button>
           <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
@@ -1395,6 +1573,9 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           </button>
           <button style={S.printBtn} onClick={() => printCampaignReport(campaignFilter)}>
             🖨️ كشف PDF
+          </button>
+          <button style={{ ...S.printBtn, color: "#A32D2D", borderColor: "#E8C4C4" }} onClick={() => deleteCampaign(campaignFilter)}>
+            🗑️ حذف الكامبين
           </button>
         </div>
       )}
@@ -3731,6 +3912,125 @@ function TrashTab({ data, restoreFromTrash, purgeFromTrash, emptyTrash }) {
 }
 
 // ============================================================================
+// لوحة المزامنة السحابية (Firebase) — تخلّي الداتا أونلاين مشتركة بين كل الأجهزة
+// ============================================================================
+function FirebasePanel({ data, setData }) {
+  const [url, setUrl] = useState(getFirebaseURL());
+  const [status, setStatus] = useState("");
+  const [busy, setBusy] = useState(false);
+  const connected = !!getFirebaseURL();
+
+  const testAndSave = async () => {
+    const clean = (url || "").trim().replace(/\/+$/, "");
+    if (!clean) { setStatus("✕ اكتب رابط قاعدة Firebase أول"); return; }
+    if (!/^https:\/\//.test(clean)) {
+      setStatus("✕ الرابط لازم يبدي بـ https://");
+      return;
+    }
+    setBusy(true);
+    setStatus("... أفحص الاتصال بقاعدة Firebase");
+    try {
+      // جرّب كتابة اختبار
+      const testResp = await fetch(`${clean}/_connectionTest.json`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ t: Date.now() }),
+      });
+      if (!testResp.ok) {
+        setStatus(`✕ ما گدرت أكتب للقاعدة (${testResp.status}). تأكد إن قواعد القراءة/الكتابة مفتوحة بـ Firebase.`);
+        setBusy(false);
+        return;
+      }
+      setFirebaseURL(clean);
+      setStatus("✓ تم الربط بنجاح! الداتا صارت أونلاين مشتركة.");
+    } catch (e) {
+      setStatus("✕ ما گدرت أوصل للقاعدة. تأكد من الرابط واتصال الإنترنت.");
+    }
+    setBusy(false);
+  };
+
+  // ارفع الداتا الحالية للسحابة (أول مرة)
+  const pushToCloud = async () => {
+    if (!getFirebaseURL()) { setStatus("✕ اربط القاعدة أول"); return; }
+    if (!window.confirm("راح ترفع كل بياناتك الحالية للسحابة. هذي تصير النسخة المشتركة لكل الموظفين. متأكد؟")) return;
+    setBusy(true);
+    setStatus("... أرفع الداتا للسحابة");
+    const ok = await saveAll(data);
+    setStatus(ok ? "✓ انرفعت الداتا للسحابة! الحين كل الموظفين يشوفونها." : "✕ فشل الرفع، جرّب مرة ثانية");
+    setBusy(false);
+  };
+
+  // اسحب الداتا من السحابة (لو تريد تستبدل المحلية بالسحابية)
+  const pullFromCloud = async () => {
+    if (!getFirebaseURL()) { setStatus("✕ اربط القاعدة أول"); return; }
+    if (!window.confirm("راح تسحب الداتا من السحابة وتستبدل اللي عندك محلياً. متأكد؟")) return;
+    setBusy(true);
+    setStatus("... أسحب الداتا من السحابة");
+    try {
+      const resp = await fetch(`${getFirebaseURL()}/ugcData.json`);
+      const remote = await resp.json();
+      if (remote && typeof remote === "object") {
+        setData({ ...EMPTY, ...remote });
+        setStatus("✓ انسحبت الداتا من السحابة!");
+      } else {
+        setStatus("✕ ماكو داتا بالسحابة بعد. ارفع داتاك أول بزر «ارفع للسحابة».");
+      }
+    } catch (e) {
+      setStatus("✕ فشل السحب، جرّب مرة ثانية");
+    }
+    setBusy(false);
+  };
+
+  const disconnect = () => {
+    if (!window.confirm("راح تفصل المزامنة السحابية. الداتا تبقى محفوظة محلياً بس ما تتزامن مع الموظفين. متأكد؟")) return;
+    setFirebaseURL("");
+    setUrl("");
+    setStatus("✓ انفصلت المزامنة. الداتا محلية الحين.");
+  };
+
+  return (
+    <div style={{ ...S.panel, border: connected ? "2px solid #0F9E8E" : "1px solid #EBE9E1", background: connected ? "#F2FBF9" : "#fff" }}>
+      <div style={S.panelTitle}>
+        ☁️ المزامنة السحابية {connected ? <span style={{ fontSize: 12, background: "#0F9E8E", color: "#fff", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>● متصل</span> : <span style={{ fontSize: 12, background: "#E8E6DE", color: "#888", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>غير متصل</span>}
+      </div>
+      <p style={S.settingHint}>
+        تربط التطبيق بقاعدة Firebase مجانية، فالداتا تصير <b>أونلاين مشتركة</b> — أي تعديل تسويه يطلع لكل الموظفين لحظياً، وكلكم تشوفون نفس الكريتورز والكامبينات والتاسكات.
+      </p>
+
+      <label style={S.fieldLabel}>رابط قاعدة Firebase (Realtime Database URL)</label>
+      <input
+        style={{ ...S.input, direction: "ltr", textAlign: "left", marginBottom: 8 }}
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://your-project-default-rtdb.firebaseio.com"
+      />
+      {status && <div style={{ fontSize: 13, fontWeight: 700, color: status.startsWith("✓") ? "#0F6E56" : status.startsWith("...") ? "#888" : "#A32D2D", margin: "8px 0", lineHeight: 1.5 }}>{status}</div>}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+        <button style={S.primaryBtn} onClick={testAndSave} disabled={busy}>🔗 اربط واحفظ</button>
+        {connected && <button style={S.secondaryBtn} onClick={pushToCloud} disabled={busy}>⬆ ارفع داتاي للسحابة</button>}
+        {connected && <button style={S.ghostBtn} onClick={pullFromCloud} disabled={busy}>⬇ اسحب من السحابة</button>}
+        {connected && <button style={{ ...S.ghostBtn, color: "#A32D2D" }} onClick={disconnect} disabled={busy}>✕ افصل</button>}
+      </div>
+
+      {!connected && (
+        <details style={{ marginTop: 14, fontSize: 13, color: "#555" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 700, color: "#0A4A42" }}>📖 شلون أسوي قاعدة Firebase مجانية؟ (خطوات)</summary>
+          <ol style={{ lineHeight: 1.9, paddingRight: 18, marginTop: 8 }}>
+            <li>روح <b>console.firebase.google.com</b> وسجّل دخول بحساب Google</li>
+            <li>اضغط «Add project» وسمّي المشروع (مثلاً ugc-iraq)</li>
+            <li>من القائمة اليسار: <b>Build ← Realtime Database ← Create Database</b></li>
+            <li>اختر «Start in test mode» (للتجربة) ← Enable</li>
+            <li>انسخ الرابط اللي يطلع فوق (يشبه: https://ugc-iraq-default-rtdb.firebaseio.com)</li>
+            <li>الصقه هنا فوق واضغط «اربط واحفظ»</li>
+            <li>بعدها اضغط «ارفع داتاي للسحابة» مرة وحدة</li>
+          </ol>
+          <p style={{ color: "#A86A00", background: "#FFF8EC", padding: 10, borderRadius: 8 }}>⚠️ «test mode» تنتهي بعد 30 يوم. لاحقاً نضبط قواعد آمنة. للحين كافية حتى تجرّب.</p>
+        </details>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // لوحة إدارة الموظفين (للأدمن فقط) — تعديل الأسماء، الرموز، الرتب، الكامبينات، والتاسكات
 // ============================================================================
 function StaffManager({ data, upd, staffList }) {
@@ -4095,6 +4395,8 @@ function SettingsTab({ data, setData, upd, staffList }) {
   return (
     <div>
       <SectionTitle>الإعدادات والبيانات</SectionTitle>
+
+      <FirebasePanel data={data} setData={setData} />
 
       <StaffManager data={data} upd={upd} staffList={staffList} />
 
