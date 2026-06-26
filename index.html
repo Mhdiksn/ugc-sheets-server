@@ -28,7 +28,6 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-<!-- كود التطبيق (المتصفح يتجاهله، نحوّله يدوياً تحت) -->
 <script type="text/plain" id="app-source">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -1627,14 +1626,11 @@ ${JSON.stringify(buildContext())}
     if (sheetUrl) {
       addMsg({ role: "ai", type: "action", text: "أقرا بيانات الشيت..." });
       setBusy(true);
-      // إذا الخادم الوسيط مضبوط استخدمه، وإلا جرّب نفس الموقع (relative) لأن التطبيق منشور مع الخادم
-      let serverBase = (data.serverUrl || "").trim();
-      if (!serverBase && typeof window !== "undefined" && window.location && window.location.origin.startsWith("http")) {
-        serverBase = window.location.origin; // التطبيق منشور على نفس خادم الـ proxy
-      }
-      if (serverBase) {
+      // إذا الخادم الوسيط مضبوط، جرّبه أول (يتجاوز حجب Google تماماً)
+      const serverUrl = (data.serverUrl || "").trim();
+      if (serverUrl) {
         try {
-          sheetCsv = await fetchViaServer(serverBase, sheetUrl, () => {
+          sheetCsv = await fetchViaServer(serverUrl, sheetUrl, () => {
             addMsg({ role: "ai", type: "action", text: "الخادم يصحى من النوم... (ممكن ياخذ نص دقيقة أول مرة)" });
           });
         } catch (e) {
@@ -1710,9 +1706,16 @@ ${JSON.stringify(buildContext())}
   };
 
   const runConversation = async () => {
+    // نحسب عنوان الخادم: serverUrl إذا مضبوط، وإلا نفس الموقع (التطبيق منشور مع الخادم)
+    let apiBase = (data.serverUrl || "").trim().replace(/\/+$/, "");
+    if (!apiBase && typeof window !== "undefined" && window.location && window.location.origin.startsWith("http")) {
+      apiBase = window.location.origin;
+    }
+    const claudeEndpoint = apiBase ? `${apiBase}/claude` : "/claude";
+
     let guard = 0;
     while (guard++ < 10) {
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const resp = await fetch(claudeEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1724,8 +1727,15 @@ ${JSON.stringify(buildContext())}
         }),
       });
       const json = await resp.json();
-      if (json.type === "error" || !json.content) {
-        addMsg({ role: "ai", type: "text", text: "ما گدرت أكمّل الطلب. جرّب مرة ثانية." });
+      if (json.type === "error" || json.error || !json.content) {
+        const errDetail = json.error ? (typeof json.error === "string" ? json.error : (json.error.message || json.error.type || "")) : "";
+        addMsg({
+          role: "ai",
+          type: "text",
+          text: errDetail === "no_api_key"
+            ? "الخادم ما عنده مفتاح API. تأكد إنك ضفت ANTHROPIC_API_KEY بإعدادات Render (Environment)."
+            : "ما گدرت أكمّل الطلب. " + (errDetail ? "(" + errDetail + ") " : "") + "جرّب مرة ثانية.",
+        });
         return;
       }
 
@@ -2050,7 +2060,7 @@ function SettingsTab({ data, setData, upd }) {
       <div style={{ ...S.panel, borderColor: "#9FE1D8" }}>
         <div style={{ ...S.panelTitle, color: "#0A4A42" }}>🔗 رابط الخادم (للقراءة التلقائية من Google Sheets)</div>
         <p style={S.settingHint}>
-          إذا فتحت التطبيق من موقعك المنشور (Render)، القراءة التلقائية تشتغل لحالها بدون ما تحط أي شي هنا. اتركه فارغ. حط رابط بس إذا الخادم بمكان ثاني غير موقع التطبيق.
+          إذا نشرت الخادم الوسيط (حسب الدليل)، حط رابطه هنا. وقتها المساعد يقرا شيتاتك تلقائياً بدون أي حجب. اتركه فارغ إذا ما عندك خادم — المساعد راح يحاول القراءة المباشرة أو رفع CSV.
         </p>
         <input
           style={{ ...S.input, direction: "ltr", textAlign: "left", marginBottom: 10 }}
@@ -2596,18 +2606,17 @@ root.render(React.createElement(App));
 
 </script>
 
-<!-- محوّل يدوي: يضمن التحويل الصحيح بدون مشاكل module -->
 <script>
 (function () {
   function showError(msg) {
     var root = document.getElementById("root");
     if (root) {
-      root.innerHTML = '<div id="boot"><div class="mark">UGC</div><div class="err">صار خطأ بتحميل التطبيق:<br>' + msg + '<br><br>جرّب تحدّث الصفحة (Ctrl+Shift+R). إذا ضل، تأكد إن الانترنت شغّال.</div></div>';
+      root.innerHTML = '<div id="boot"><div class="mark">UGC</div><div class="err">صار خطأ بتحميل التطبيق:<br>' + msg + '<br><br>جرب تحدث الصفحة (Ctrl+Shift+R).</div></div>';
     }
   }
   try {
     if (typeof Babel === "undefined" || typeof React === "undefined" || typeof ReactDOM === "undefined") {
-      showError("ما گدر يحمّل المكتبات من الانترنت. تأكد من اتصالك وحدّث الصفحة.");
+      showError("ما گدر يحمل المكتبات من الانترنت. تأكد من اتصالك وحدث الصفحة.");
       return;
     }
     var source = document.getElementById("app-source").textContent;
