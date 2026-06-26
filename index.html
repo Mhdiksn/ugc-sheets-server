@@ -46,6 +46,15 @@ const fmt = (n) =>
     Math.round(Number(n) || 0)
   );
 
+// يعرض المتابعين بشكل مختصر: 390000 -> 390K، 1300000 -> 1.3M
+const fmtFollowers = (n) => {
+  const v = Number(n) || 0;
+  if (v <= 0) return "—";
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1).replace(/\.0$/, "") + "M";
+  if (v >= 1000) return Math.round(v / 1000) + "K";
+  return String(v);
+};
+
 const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -2142,23 +2151,25 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       </div>
 
       {adding && (
-        <div style={S.panel}>
-          <div style={S.panelTitle}>{editId ? "تعديل كريتور" : "كريتور جديد للقاعدة"}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-            <input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" />
-            <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} placeholder="رابط الحساب أو @username" />
-            <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="رقم الموبايل (واتساب)" />
-            <input style={S.input} type="number" value={form.followers} onChange={(e) => setForm({ ...form, followers: e.target.value })} placeholder="عدد المتابعين" />
-            <input style={S.input} type="number" value={form.lastPrice} onChange={(e) => setForm({ ...form, lastPrice: e.target.value })} placeholder="آخر سعر (اختياري)" />
-            <input style={S.input} value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} placeholder="المحافظة (اختياري)" list="iq-provinces" />
-            <datalist id="iq-provinces">
-              {["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "كربلاء", "كركوك", "بابل", "الأنبار", "ذي قار", "ديالى", "السليمانية", "واسط", "صلاح الدين", "القادسية", "ميسان", "المثنى", "دهوك", "حلبجة"].map((p) => <option key={p} value={p} />)}
-            </datalist>
-            <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button style={S.primaryBtn} onClick={saveCreator}>{editId ? "حفظ التعديل" : "أضف"}</button>
-            <button style={S.ghostBtn} onClick={() => { setAdding(false); setEditId(null); resetForm(); }}>إلغاء</button>
+        <div style={S.modalOverlay} onClick={() => { setAdding(false); setEditId(null); resetForm(); }}>
+          <div style={{ ...S.modalCard, maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+            <div style={S.panelTitle}>{editId ? "تعديل كريتور" : "كريتور جديد للقاعدة"}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10, marginTop: 8 }}>
+              <input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" />
+              <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} placeholder="رابط الحساب أو @username" />
+              <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="رقم الموبايل (واتساب)" />
+              <input style={S.input} type="number" value={form.followers} onChange={(e) => setForm({ ...form, followers: e.target.value })} placeholder="عدد المتابعين" />
+              <input style={S.input} type="number" value={form.lastPrice} onChange={(e) => setForm({ ...form, lastPrice: e.target.value })} placeholder="آخر سعر (اختياري)" />
+              <input style={S.input} value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} placeholder="المحافظة (اختياري)" list="iq-provinces" />
+              <datalist id="iq-provinces">
+                {["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "كربلاء", "كركوك", "بابل", "الأنبار", "ذي قار", "ديالى", "السليمانية", "واسط", "صلاح الدين", "القادسية", "ميسان", "المثنى", "دهوك", "حلبجة"].map((p) => <option key={p} value={p} />)}
+              </datalist>
+              <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={S.primaryBtn} onClick={saveCreator}>{editId ? "حفظ التعديل" : "أضف"}</button>
+              <button style={S.ghostBtn} onClick={() => { setAdding(false); setEditId(null); resetForm(); }}>إلغاء</button>
+            </div>
           </div>
         </div>
       )}
@@ -2272,7 +2283,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                       "—"
                     )}
                   </td>
-                  <td style={S.tdNum}>{c.followers ? Number(c.followers).toLocaleString("en-US") : "—"}</td>
+                  <td style={S.tdNum}>{c.followers ? fmtFollowers(c.followers) : "—"}</td>
                   <td style={S.tdNum}>{c.lastPrice ? fmt(c.lastPrice) : "—"}</td>
                   <td style={S.tdMuted}>{c.province || "—"}</td>
                   <td style={S.tdMuted}>{c.note || "—"}</td>
