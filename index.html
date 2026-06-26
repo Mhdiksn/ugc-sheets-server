@@ -50,6 +50,16 @@ const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+// يحوّل أي handle/رابط لرابط كامل قابل للضغط
+const toUrl = (handle) => {
+  if (!handle) return "#";
+  let h = String(handle).trim();
+  if (/^https?:\/\//i.test(h)) return h;
+  if (h.startsWith("@")) h = h.slice(1);
+  if (h.includes(".") || h.includes("/")) return "https://" + h;
+  return "https://www.instagram.com/" + h;
+};
+
 const STATUS = {
   paid: { label: "مدفوع", c: "#1D9E75", bg: "#E1F5EE", t: "#0F6E56" },
   partial: { label: "جزئي", c: "#BA7517", bg: "#FAEEDA", t: "#854F0B" },
@@ -96,6 +106,7 @@ async function saveAll(data) {
 // ---- بيانات افتراضية فارغة -------------------------------------------------
 const EMPTY = {
   creators: [], // {id, name, handle, phone, superKey, campaign, amount, paid, payStatus, pubStatus, pubLink, date, note}
+  creatorsDB: [], // قاعدة بيانات الكريتورز (بدون دفعات): {id, name, handle, followers, note}
   campaigns: [], // {id, name, client, revenue, cost, date, splits:[{name, pct}]}
   expenses: [], // {id, label, amount, type:'company'|'personal', date, note}
   capital: 0, // رأس مال / رصيد الشركة الابتدائي
@@ -287,6 +298,7 @@ function App() {
   const tabs = [
     { id: "overview", label: "نظرة عامة", icon: "📊" },
     { id: "creators", label: "مدفوعات الكريتورز", icon: "🎬" },
+    { id: "database", label: "قاعدة الكريتورز", icon: "📇" },
     { id: "chat", label: "المساعد الذكي", icon: "🤖" },
     { id: "campaigns", label: "الكامبينات والأرباح", icon: "📈" },
     { id: "expenses", label: "الصرفيات", icon: "💸" },
@@ -337,6 +349,7 @@ function App() {
           {tab === "creators" && (
             <CreatorsTab data={data} upd={upd} calc={calc} />
           )}
+          {tab === "database" && <DatabaseTab data={data} upd={upd} />}
           {tab === "chat" && <ChatTab data={data} upd={upd} />}
           {tab === "campaigns" && (
             <CampaignsTab data={data} upd={upd} partnerTotals={partnerTotals} />
@@ -459,6 +472,11 @@ function CreatorsTab({ data, upd }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [campaignFilter, setCampaignFilter] = useState("all"); // تصفية حسب الكامبين
+  // تحويل للقاعدة (تأشير متعدد)
+  const [transferMode, setTransferMode] = useState(false);
+  const [selectedT, setSelectedT] = useState({});
+  const [transferMsg, setTransferMsg] = useState("");
 
   const statusOf = (c) => {
     if (c.payStatus && STATUS[c.payStatus]) return c.payStatus; // اختيار يدوي له الأولوية
@@ -470,11 +488,16 @@ function CreatorsTab({ data, upd }) {
   };
   const pubOf = (c) => (c.pubStatus === "published" ? "published" : "unpublished");
 
+  // قائمة الكامبينات الموجودة بالمدفوعات
+  const campaignNames = [...new Set(data.creators.map((c) => c.campaign).filter(Boolean))];
+
   const q = search.trim().toLowerCase();
   const list = data.creators.filter((c) => {
     const ps = statusOf(c);
     const pub = c.pubStatus === "published";
     const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
+    // تصفية الكامبين
+    if (campaignFilter !== "all" && (c.campaign || "") !== campaignFilter) return false;
     let passFilter = true;
     if (filter === "all") passFilter = true;
     else if (filter === "published") passFilter = pub;
@@ -491,6 +514,49 @@ function CreatorsTab({ data, upd }) {
       (c.campaign || "").toLowerCase().includes(q)
     );
   });
+
+  // تحويل المختارين للقاعدة الرئيسية
+  const selTCount = Object.values(selectedT).filter(Boolean).length;
+  const toggleT = (id) => setSelectedT((p) => ({ ...p, [id]: !p[id] }));
+  const selectAllT = () => {
+    const all = {};
+    list.forEach((c) => (all[c.id] = true));
+    setSelectedT(all);
+  };
+  const transferToDatabase = () => {
+    const chosen = data.creators.filter((c) => selectedT[c.id]);
+    if (chosen.length === 0) return;
+    upd((d) => {
+      const dbList = d.creatorsDB || [];
+      let added = 0;
+      chosen.forEach((c) => {
+        // تجنّب التكرار: نفس الاسم أو نفس الرابط
+        const exists = dbList.find(
+          (x) => (x.handle && c.handle && x.handle === c.handle) || (x.name && c.name && x.name === c.name)
+        );
+        if (exists) {
+          // حدّث آخر سعر إذا موجود
+          if (Number(c.amount) > 0) exists.lastPrice = Number(c.amount) || 0;
+        } else {
+          dbList.unshift({
+            id: "db" + Date.now() + Math.random().toString(36).slice(2, 6),
+            name: c.name || "",
+            handle: c.handle || "",
+            followers: Number(c.followers) || 0,
+            lastPrice: Number(c.amount) || 0,
+            note: "",
+          });
+          added++;
+        }
+      });
+      d.creatorsDB = dbList;
+      return d;
+    });
+    setTransferMsg(`✓ حوّلت ${chosen.length} كريتور للقاعدة الرئيسية`);
+    setTimeout(() => setTransferMsg(""), 3500);
+    setTransferMode(false);
+    setSelectedT({});
+  };
 
   const blank = () => ({
     id: uid(),
@@ -603,6 +669,46 @@ function CreatorsTab({ data, upd }) {
         </div>
       )}
 
+      {/* تصفية حسب الكامبين */}
+      {campaignNames.length > 0 && (
+        <div style={S.campaignFilterRow}>
+          <span style={S.campaignFilterLabel}>الكامبين:</span>
+          <button
+            onClick={() => setCampaignFilter("all")}
+            style={{ ...S.campChip, ...(campaignFilter === "all" ? S.campChipActive : {}) }}
+          >
+            كل الكامبينات
+          </button>
+          {campaignNames.map((cn) => (
+            <button
+              key={cn}
+              onClick={() => setCampaignFilter(cn)}
+              style={{ ...S.campChip, ...(campaignFilter === cn ? S.campChipActive : {}) }}
+            >
+              {cn}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* أزرار التحويل للقاعدة */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        {!transferMode ? (
+          <button style={S.secondaryBtn} onClick={() => setTransferMode(true)} disabled={list.length === 0}>
+            🔄 حوّل كريتورز للقاعدة الرئيسية
+          </button>
+        ) : (
+          <>
+            <button style={S.primaryBtn} onClick={transferToDatabase} disabled={selTCount === 0}>
+              حوّل {selTCount} للقاعدة ←
+            </button>
+            <button style={S.secondaryBtn} onClick={selectAllT}>اختر الكل</button>
+            <button style={S.ghostBtn} onClick={() => { setTransferMode(false); setSelectedT({}); }}>إلغاء</button>
+          </>
+        )}
+        {transferMsg && <span style={{ fontSize: 13, fontWeight: 600, color: "#0F6E56" }}>{transferMsg}</span>}
+      </div>
+
       <div style={S.filterRow}>
         {[
           { id: "all", label: "الكل" },
@@ -626,6 +732,23 @@ function CreatorsTab({ data, upd }) {
         ))}
       </div>
 
+      {/* عنوان الكامبين المختار + ملخّص */}
+      {campaignFilter !== "all" && (
+        <div style={S.campaignSummary}>
+          <span style={{ fontWeight: 700, color: "#0A4A42" }}>كامبين «{campaignFilter}»</span>
+          <span style={{ color: "#888780", fontSize: 13 }}>
+            {(() => {
+              const camp = data.creators.filter((c) => (c.campaign || "") === campaignFilter);
+              const paid = camp.filter((c) => statusOf(c) === "paid").length;
+              const unpaid = camp.filter((c) => statusOf(c) !== "paid").length;
+              const total = camp.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+              const paidAmt = camp.reduce((s, c) => s + (Number(c.paid) || 0), 0);
+              return `${camp.length} كريتور · ${paid} مدفوع · ${unpaid} باقي · المدفوع ${fmt(paidAmt)} من ${fmt(total)}`;
+            })()}
+          </span>
+        </div>
+      )}
+
       {list.length === 0 ? (
         <Empty text="ماكو كريتورز بهالفلتر. اضغط «كريتور جديد» حتى تبدي." />
       ) : (
@@ -633,6 +756,7 @@ function CreatorsTab({ data, upd }) {
           <table style={S.table}>
             <thead>
               <tr>
+                {transferMode && <th style={{ ...S.th, width: 40 }}></th>}
                 <th style={S.th}>الاسم</th>
                 <th style={S.th}>الموبايل</th>
                 <th style={S.th}>السوبر كي</th>
@@ -650,10 +774,19 @@ function CreatorsTab({ data, upd }) {
                 const st = statusOf(c);
                 const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
                 return (
-                  <tr key={c.id} style={S.tr}>
+                  <tr key={c.id} style={{ ...S.tr, ...(transferMode && selectedT[c.id] ? { background: "#F2FBF9" } : {}) }}>
+                    {transferMode && (
+                      <td style={S.td}>
+                        <input type="checkbox" checked={!!selectedT[c.id]} onChange={() => toggleT(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#0A4A42" }} />
+                      </td>
+                    )}
                     <td style={S.td}>
                       <div style={S.cName}>{c.name || "—"}</div>
-                      {c.handle && <div style={S.cHandle}>{c.handle}</div>}
+                      {c.handle && (
+                        <a href={toUrl(c.handle)} target="_blank" rel="noopener noreferrer" style={S.cHandleLink}>
+                          {c.handle}
+                        </a>
+                      )}
                     </td>
                     <td style={S.tdMono}>{c.phone || "—"}</td>
                     <td style={S.tdKey}>{c.superKey || "—"}</td>
@@ -1137,6 +1270,263 @@ function ExpenseForm({ rec, onSave, onCancel }) {
 }
 
 // ============================================================================
+// تبويب قاعدة الكريتورز — دليل أسماء بدون دفعات، تُستخدم لإضافة كريتورز للكامبينات
+// ============================================================================
+function DatabaseTab({ data, upd }) {
+  const db = data.creatorsDB || [];
+  const [search, setSearch] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState({ name: "", handle: "", followers: "", lastPrice: "", note: "" });
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState({});
+  const [showAssign, setShowAssign] = useState(false);
+  const [assign, setAssign] = useState({ campaign: "", amount: "" });
+  const [msg, setMsg] = useState("");
+
+  const resetForm = () => setForm({ name: "", handle: "", followers: "", lastPrice: "", note: "" });
+
+  const saveCreator = () => {
+    if (!form.name.trim() && !form.handle.trim()) {
+      setMsg("اكتب اسم أو رابط على الأقل");
+      setTimeout(() => setMsg(""), 2500);
+      return;
+    }
+    if (editId) {
+      upd((d) => {
+        const c = (d.creatorsDB || []).find((x) => x.id === editId);
+        if (c) {
+          c.name = form.name.trim();
+          c.handle = form.handle.trim();
+          c.followers = Number(form.followers) || 0;
+          c.lastPrice = Number(form.lastPrice) || 0;
+          c.note = form.note.trim();
+        }
+        return d;
+      });
+      setEditId(null);
+    } else {
+      const item = {
+        id: "db" + Date.now() + Math.random().toString(36).slice(2, 6),
+        name: form.name.trim(),
+        handle: form.handle.trim(),
+        followers: Number(form.followers) || 0,
+        lastPrice: Number(form.lastPrice) || 0,
+        note: form.note.trim(),
+      };
+      upd((d) => {
+        d.creatorsDB = [item, ...(d.creatorsDB || [])];
+        return d;
+      });
+    }
+    resetForm();
+    setAdding(false);
+  };
+
+  const startEdit = (c) => {
+    setForm({ name: c.name || "", handle: c.handle || "", followers: c.followers || "", lastPrice: c.lastPrice || "", note: c.note || "" });
+    setEditId(c.id);
+    setAdding(true);
+  };
+
+  const removeCreator = (id) => {
+    upd((d) => {
+      d.creatorsDB = (d.creatorsDB || []).filter((x) => x.id !== id);
+      return d;
+    });
+  };
+
+  const q = search.trim().toLowerCase();
+  const list = db.filter(
+    (c) =>
+      !q ||
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.handle || "").toLowerCase().includes(q)
+  );
+
+  const selCount = Object.values(selected).filter(Boolean).length;
+  const toggleSel = (id) => setSelected((p) => ({ ...p, [id]: !p[id] }));
+  const selectAll = () => {
+    const all = {};
+    list.forEach((c) => (all[c.id] = true));
+    setSelected(all);
+  };
+  const clearSel = () => setSelected({});
+
+  const addSelectedToCampaign = () => {
+    if (!assign.campaign.trim()) {
+      setMsg("اكتب اسم الكامبين");
+      setTimeout(() => setMsg(""), 2500);
+      return;
+    }
+    const chosen = db.filter((c) => selected[c.id]);
+    const amt = Number(assign.amount) || 0;
+    const newOnes = chosen.map((c) => ({
+      id: "c" + Date.now() + Math.random().toString(36).slice(2, 6),
+      name: c.name,
+      handle: c.handle,
+      phone: "",
+      superKey: "",
+      campaign: assign.campaign.trim(),
+      amount: amt,
+      paid: 0,
+      payStatus: "unpaid",
+      pubStatus: "unpublished",
+      pubLink: "",
+      date: todayISO(),
+      note: "",
+    }));
+    upd((d) => {
+      d.creators = [...newOnes, ...(d.creators || [])];
+      return d;
+    });
+    setMsg("\u2713 \u0623\u0636\u0641\u062a " + chosen.length + " \u0643\u0631\u064a\u062a\u0648\u0631 \u0644\u0643\u0627\u0645\u0628\u064a\u0646 \u00ab" + assign.campaign.trim() + "\u00bb");
+    setTimeout(() => setMsg(""), 3500);
+    setShowAssign(false);
+    setSelectMode(false);
+    clearSel();
+    setAssign({ campaign: "", amount: "" });
+  };
+
+  return (
+    <div>
+      <div style={S.tabHead}>
+        <SectionTitle noMargin>قاعدة الكريتورز</SectionTitle>
+        <span style={S.chatBadge}>{db.length} كريتور بالقاعدة</span>
+      </div>
+
+      <p style={{ fontSize: 13.5, color: "#888780", margin: "0 0 16px", lineHeight: 1.7 }}>
+        هنا دليل كل الكريتورز (اسم، رابط، متابعين) — بدون دفعات. لمن تسوي كامبين، أشّر على الأسماء اللي بالكامبين وأضفهم لمدفوعات الكريتورز بضغطة، بدون ما تعيد كتابتهم.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
+        <button style={S.primaryBtn} onClick={() => { setAdding((v) => !v); setEditId(null); resetForm(); }}>
+          + كريتور للقاعدة
+        </button>
+        {!selectMode ? (
+          <button style={S.secondaryBtn} onClick={() => setSelectMode(true)} disabled={db.length === 0}>
+            ☑ اختر كريتورز لكامبين
+          </button>
+        ) : (
+          <>
+            <button style={S.primaryBtn} onClick={() => setShowAssign(true)} disabled={selCount === 0}>
+              أضف {selCount} لكامبين ←
+            </button>
+            <button style={S.secondaryBtn} onClick={selectAll}>اختر الكل</button>
+            <button style={S.ghostBtn} onClick={() => { setSelectMode(false); clearSel(); }}>إلغاء</button>
+          </>
+        )}
+        {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith("\u2713") ? "#0F6E56" : "#A32D2D" }}>{msg}</span>}
+      </div>
+
+      {adding && (
+        <div style={S.panel}>
+          <div style={S.panelTitle}>{editId ? "تعديل كريتور" : "كريتور جديد للقاعدة"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+            <input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" />
+            <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} placeholder="رابط الحساب أو @username" />
+            <input style={S.input} type="number" value={form.followers} onChange={(e) => setForm({ ...form, followers: e.target.value })} placeholder="عدد المتابعين" />
+            <input style={S.input} type="number" value={form.lastPrice} onChange={(e) => setForm({ ...form, lastPrice: e.target.value })} placeholder="آخر سعر (اختياري)" />
+            <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={S.primaryBtn} onClick={saveCreator}>{editId ? "حفظ التعديل" : "أضف"}</button>
+            <button style={S.ghostBtn} onClick={() => { setAdding(false); setEditId(null); resetForm(); }}>إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      <div style={S.searchWrap}>
+        <span style={S.searchIcon}>🔍</span>
+        <input style={S.searchInput} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="دور على كريتور بالاسم أو الرابط..." />
+      </div>
+
+      {list.length === 0 ? (
+        <div style={S.emptyState}>
+          {db.length === 0 ? "ماكو كريتورز بالقاعدة بعد. اضغط «+ كريتور للقاعدة» وابدأ تضيف." : "ماكو نتائج للبحث."}
+        </div>
+      ) : (
+        <div style={S.tableWrap}>
+          <table style={S.table}>
+            <thead>
+              <tr>
+                {selectMode && <th style={{ ...S.th, width: 40 }}></th>}
+                <th style={S.th}>الاسم</th>
+                <th style={S.th}>رابط الحساب</th>
+                <th style={S.thNum}>المتابعين</th>
+                <th style={S.thNum}>آخر سعر</th>
+                <th style={S.th}>ملاحظة</th>
+                <th style={{ ...S.th, width: 90 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((c) => (
+                <tr key={c.id} style={{ ...S.tr, ...(selectMode && selected[c.id] ? { background: "#F2FBF9" } : {}) }}>
+                  {selectMode && (
+                    <td style={S.td}>
+                      <input type="checkbox" checked={!!selected[c.id]} onChange={() => toggleSel(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#0A4A42" }} />
+                    </td>
+                  )}
+                  <td style={S.td}>
+                    <div style={S.cName}>{c.name || "—"}</div>
+                  </td>
+                  <td style={S.td}>
+                    {c.handle ? (
+                      <a href={toUrl(c.handle)} target="_blank" rel="noopener noreferrer" style={S.cHandleLink}>
+                        {c.handle}
+                      </a>
+                    ) : (
+                      <span style={{ color: "#C4C2BB" }}>—</span>
+                    )}
+                  </td>
+                  <td style={S.tdNum}>{c.followers ? Number(c.followers).toLocaleString("en-US") : "—"}</td>
+                  <td style={S.tdNum}>{c.lastPrice ? fmt(c.lastPrice) : "—"}</td>
+                  <td style={S.tdMuted}>{c.note || "—"}</td>
+                  <td style={S.td}>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      <button style={S.iconBtn} onClick={() => startEdit(c)} title="تعديل">✎</button>
+                      <button style={S.iconBtnDanger} onClick={() => removeCreator(c.id)} title="حذف">✕</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAssign && (
+        <div style={S.modalOverlay} onClick={() => setShowAssign(false)}>
+          <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={S.panelTitle}>أضف {selCount} كريتور لكامبين</div>
+            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 14px", lineHeight: 1.6 }}>
+              راح ينضافون لتبويب «مدفوعات الكريتورز» باسم الكامبين والسعر اللي تحدده. تگدر تعدّل سعر كل واحد بعدين من هناك.
+            </p>
+            <div style={{ marginBottom: 10 }}>
+              <label style={S.fieldLabel}>اسم الكامبين</label>
+              <input style={S.input} value={assign.campaign} onChange={(e) => setAssign({ ...assign, campaign: e.target.value })} placeholder="مثلاً: Babarooti" list="campaign-list-db" />
+              <datalist id="campaign-list-db">
+                {[...new Set((data.campaigns || []).map((c) => c.name).concat((data.creators || []).map((c) => c.campaign)))].filter(Boolean).map((n, i) => (
+                  <option key={i} value={n} />
+                ))}
+              </datalist>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={S.fieldLabel}>السعر لكل كريتور (تگدر تخليه صفر وتعدّله بعدين)</label>
+              <input style={S.input} type="number" value={assign.amount} onChange={(e) => setAssign({ ...assign, amount: e.target.value })} placeholder="0" />
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={S.primaryBtn} onClick={addSelectedToCampaign}>أضفهم للكامبين</button>
+              <button style={S.ghostBtn} onClick={() => setShowAssign(false)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // تبويب المساعد الذكي — يقرا سكرين شوت التحويل ويسجّل الدفعة
 // ============================================================================
 function ChatTab({ data, upd }) {
@@ -1204,6 +1594,16 @@ function ChatTab({ data, upd }) {
     upd((d) => {
       d.conversations = (d.conversations || []).filter((c) => c.id !== id);
       if (d.activeConvId === id) d.activeConvId = d.conversations[0] ? d.conversations[0].id : null;
+      return d;
+    });
+  };
+  const renameConversation = (id, currentTitle) => {
+    const t = window.prompt("اسم المحادثة الجديد:", currentTitle || "");
+    if (t === null) return; // ألغى
+    const trimmed = t.trim();
+    upd((d) => {
+      const conv = (d.conversations || []).find((c) => c.id === id);
+      if (conv) conv.title = trimmed || "محادثة";
       return d;
     });
   };
@@ -1920,6 +2320,9 @@ ${JSON.stringify(buildContext())}
                         {(MODELS.find((m) => m.id === c.model) || {}).name || "Sonnet"} · {c.messages.length - 1} رسالة
                       </div>
                     </button>
+                    <button style={S.convRenameBtn} onClick={() => renameConversation(c.id, c.title)} title="إعادة تسمية">
+                      ✎
+                    </button>
                     {conversations.length > 1 && (
                       <button style={S.convDelBtn} onClick={() => deleteConversation(c.id)} title="حذف">
                         🗑
@@ -2577,19 +2980,27 @@ const S = {
   },
   chipActive: { background: "#0A4A42", color: "#fff", borderColor: "#0A4A42", fontWeight: 600 },
 
+  campaignFilterRow: { display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center", background: "#F2FBF9", border: "1px solid #D6F0EA", borderRadius: 12, padding: "10px 14px" },
+  campaignFilterLabel: { fontSize: 13, fontWeight: 700, color: "#0A4A42", marginLeft: 4 },
+  campChip: { background: "#fff", border: "1px solid #BFE6DE", borderRadius: 99, padding: "6px 15px", fontSize: 13, cursor: "pointer", color: "#0F6E56", fontFamily: FONT, fontWeight: 500 },
+  campChipActive: { background: "#0F9E8E", color: "#fff", borderColor: "#0F9E8E", fontWeight: 700 },
+  campaignSummary: { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: "#FBFAF7", border: "1px solid #EBE9E1", borderRadius: 10, padding: "10px 16px", marginBottom: 12 },
+
   // tables
-  tableWrap: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, overflow: "hidden" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5 },
-  th: { textAlign: "right", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
-  thNum: { textAlign: "left", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
-  thAct: { width: 110, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
+  tableWrap: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, overflowX: "auto", overflowY: "hidden" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 900 },
+  th: { textAlign: "right", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7", whiteSpace: "nowrap" },
+  thNum: { textAlign: "left", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7", whiteSpace: "nowrap" },
+  thAct: { width: 130, minWidth: 130, borderBottom: "1px solid #EBE9E1", background: "#FBFAF7" },
   tr: { borderBottom: "1px solid #F4F2EB" },
   td: { padding: "12px 16px", verticalAlign: "middle" },
   tdMuted: { padding: "12px 16px", color: "#888780", verticalAlign: "middle" },
   tdNum: { padding: "12px 16px", textAlign: "left", fontVariantNumeric: "tabular-nums", fontWeight: 600, verticalAlign: "middle" },
-  tdAct: { padding: "10px 16px", verticalAlign: "middle" },
+  tdAct: { padding: "10px 16px", verticalAlign: "middle", width: 130, minWidth: 130 },
   cName: { fontWeight: 600, color: "#2C2C2A" },
   cHandle: { fontSize: 12, color: "#A8A69C", marginTop: 2 },
+  cHandleLink: { fontSize: 12, color: "#0F9E8E", marginTop: 2, textDecoration: "none", display: "inline-block", direction: "ltr", borderBottom: "1px solid transparent" },
+  emptyState: { textAlign: "center", padding: "48px 20px", color: "#A8A6A0", fontSize: 14, background: "#FAF9F6", borderRadius: 12, border: "1px dashed #E0DED6" },
   tdMono: { padding: "12px 16px", color: "#444441", verticalAlign: "middle", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
   tdKey: { padding: "12px 16px", verticalAlign: "middle", fontWeight: 700, color: "#0A4A42", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
 
@@ -2606,10 +3017,10 @@ const S = {
   lookupKey: { fontSize: 12.5, color: "#0F6E56" },
   lookupVal: { fontSize: 14, color: "#2C2C2A", fontVariantNumeric: "tabular-nums", direction: "ltr" },
 
-  actGroup: { display: "flex", gap: 6, justifyContent: "flex-start" },
-  iconBtn: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#5F5E5A" },
-  iconBtnGood: { width: 30, height: 30, borderRadius: 8, border: "1px solid #9FE1CB", background: "#E1F5EE", cursor: "pointer", fontSize: 13, color: "#0F6E56", fontWeight: 700 },
-  iconBtnDanger: { width: 30, height: 30, borderRadius: 8, border: "1px solid #F4C0B3", background: "#FCEBEB", cursor: "pointer", fontSize: 12, color: "#A32D2D" },
+  actGroup: { display: "flex", gap: 8, justifyContent: "flex-start" },
+  iconBtn: { width: 36, height: 36, borderRadius: 9, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 15, color: "#5F5E5A", flexShrink: 0 },
+  iconBtnGood: { width: 36, height: 36, borderRadius: 9, border: "1px solid #9FE1CB", background: "#E1F5EE", cursor: "pointer", fontSize: 15, color: "#0F6E56", fontWeight: 700, flexShrink: 0 },
+  iconBtnDanger: { width: 36, height: 36, borderRadius: 9, border: "1px solid #F4C0B3", background: "#FCEBEB", cursor: "pointer", fontSize: 14, color: "#A32D2D", flexShrink: 0 },
 
   pill: { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 99, fontSize: 12.5, fontWeight: 600 },
 
@@ -2694,6 +3105,7 @@ const S = {
   convItem: { display: "flex", alignItems: "center", gap: 4, borderRadius: 8, marginBottom: 2 },
   convItemActive: { background: "#F2FBF9" },
   convItemMain: { flex: 1, textAlign: "right", background: "transparent", border: "none", borderRadius: 8, padding: "9px 10px", cursor: "pointer", fontFamily: FONT, overflow: "hidden" },
+  convRenameBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, padding: "6px 7px", borderRadius: 6, flexShrink: 0, color: "#5F5E5A" },
   convDelBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: "6px 8px", borderRadius: 6, flexShrink: 0 },
   chatWindow: { background: "#FBFAF7", border: "1px solid #EBE9E1", borderRadius: 16, padding: 18, minHeight: 360, maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 },
   aiRow: { display: "flex", gap: 10, alignItems: "flex-start" },
@@ -2748,6 +3160,8 @@ const S = {
 
   // modal
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(8,40,36,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto" },
+  modalCard: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", padding: 24 },
+  ghostBtn: { background: "transparent", color: "#888780", border: "1px solid #E0DED6", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
   modal: { background: "#fff", borderRadius: 16, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", display: "flex", flexDirection: "column" },
   modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: "1px solid #EBE9E1" },
   modalTitle: { fontSize: 16, fontWeight: 700, color: "#2C2C2A" },
