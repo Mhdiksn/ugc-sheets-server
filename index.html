@@ -1,14 +1,14 @@
-<meta charset="UTF-8" />
+<meta charset="UTF-8" /><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;800;900&display=swap" rel="stylesheet">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>ugc system</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: #F5F3EE; }
+  html, body { margin: 0; padding: 0; background: #FFFFFF; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; }
   #root { min-height: 100vh; }
-  #boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; color: #1B5E3B; flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
-  #boot .mark { width: 56px; height: 56px; border-radius: 14px; background: linear-gradient(135deg, #2D8C5E 0%, #1B5E3B 100%); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
-  #boot .spin { width: 28px; height: 28px; border: 3px solid #D4EDE0; border-top-color: #2D8C5E; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
-  #boot .err { color: #A32D2D; font-size: 14px; max-width: 400px; line-height: 1.6; }
+  #boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; color: #16A699; flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
+  #boot .mark { width: 56px; height: 56px; border-radius: 14px; background: #16A699; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+  #boot .spin { width: 28px; height: 28px; border: 3px solid #EDEFEF; border-top-color: #16A699; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
+  #boot .err { color: #D32F2F; font-size: 14px; max-width: 400px; line-height: 1.6; }
   @keyframes bootspin { to { transform: rotate(360deg); } }
 </style>
 </head>
@@ -98,14 +98,14 @@ const waLink = (phone) => {
 };
 
 const STATUS = {
-  paid: { label: "مدفوع", c: "#1D9E75", bg: "#D4EDE0", t: "#1B5E3B" },
-  partial: { label: "جزئي", c: "#BA7517", bg: "#FAEEDA", t: "#854F0B" },
-  unpaid: { label: "باقي", c: "#E24B4A", bg: "#FCEBEB", t: "#A32D2D" },
+  paid: { label: "مدفوع", c: "#16A699", bg: "#EDEFEF", t: "#16A699" },
+  partial: { label: "جزئي", c: "#F59E0B", bg: "#FEF3C7", t: "#92400E" },
+  unpaid: { label: "باقي", c: "#EF4444", bg: "#FEE2E2", t: "#D32F2F" },
 };
 
 const PUB_STATUS = {
-  published: { label: "تم النشر", c: "#1D9E75", bg: "#D4EDE0", t: "#1B5E3B" },
-  unpublished: { label: "لم يُنشر", c: "#888780", bg: "#F1EFE8", t: "#5F5E5A" },
+  published: { label: "تم النشر", c: "#16A699", bg: "#EDEFEF", t: "#16A699" },
+  unpublished: { label: "لم يُنشر", c: "#6B7676", bg: "#EDEFEF", t: "#6B7676" },
 };
 
 // تلوين قوائم الحالة حسب القيمة
@@ -603,8 +603,8 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
                 setPinErr(false);
               }}
               onKeyDown={(e) => { if (e.key === "Enter") tryLogin(); }}
-              placeholder="رمز الدخول"
-              style={{ ...S.lockInput, borderColor: pinErr ? "#E24B4A" : "#D3D1C7" }}
+              placeholder="ACCESS CODE"
+              style={{ ...S.lockInput, borderColor: pinErr ? "#EF4444" : "#D8DCDC" }}
               autoFocus
             />
             {pinErr && <div style={S.lockErr}>رمز الدخول غلط</div>}
@@ -621,7 +621,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
     return (
       <Shell>
         <div style={{ ...S.lockWrap }}>
-          <div style={{ color: "#888780", fontSize: 15 }}>...يحمّل البيانات</div>
+          <div style={{ color: "#6B7676", fontSize: 15 }}>...يحمّل البيانات</div>
         </div>
       </Shell>
     );
@@ -661,11 +661,11 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
             <div style={S.brandMark}>UGC</div>
             <div>
               <div style={S.brandName}>UGC IRAQ</div>
-              <div style={S.brandSub}>{currentUser ? `${currentUser.name} — ${currentUser.role === "admin" ? "أدمن" : "موظف"}` : "UGC Iraq"}</div>
+              <div style={S.brandSub}>{currentUser ? `${currentUser.name} — ${currentUser.role === "admin" ? "أدمن" : "موظف"}` : "UGC®"}</div>
             </div>
           </div>
           <div style={S.headerRight}>
-            {syncMsg && <span style={{ fontSize: 12, color: "#2D8C5E", fontWeight: 700 }}>{syncMsg}</span>}
+            {syncMsg && <span style={{ fontSize: 12, color: "#16A699", fontWeight: 700 }}>{syncMsg}</span>}
             <SaveBadge state={saveState} />
             <button style={S.logoutBtn} onClick={() => { setAuthed(false); setCurrentUser(null); setPinInput(""); }}>
               قفل
@@ -786,7 +786,7 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
                         style={{
                           ...S.barFill,
                           width: `${w}%`,
-                          background: p.amount >= 0 ? "#2D8C5E" : "#E24B4A",
+                          background: p.amount >= 0 ? "#16A699" : "#EF4444",
                         }}
                       />
                     </div>
@@ -894,7 +894,7 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
                   <div key={i} style={S.barRow}>
                     <div style={{ ...S.barLabel, minWidth: 120 }}>{c.name} <span style={{ color: "#A8A6A0", fontSize: 11 }}>({c.count})</span></div>
                     <div style={S.barTrack}>
-                      <div style={{ ...S.barFill, width: `${w}%`, background: "#2D8C5E" }} />
+                      <div style={{ ...S.barFill, width: `${w}%`, background: "#16A699" }} />
                     </div>
                     <div style={S.barVal}>{fmt(c.due)}</div>
                   </div>
@@ -934,7 +934,7 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
                 </div>
               ))}
             </div>
-            <p style={{ fontSize: 12.5, color: "#888780", margin: "8px 2px 0" }}>
+            <p style={{ fontSize: 12.5, color: "#6B7676", margin: "8px 2px 0" }}>
               💡 هذوله أكثر ناس اشتغلوا وياك — مرشحين ممتازين للتعاون المتكرر بالكامبينات الجاية.
             </p>
           </div>
@@ -959,7 +959,7 @@ function Overview({ calc, partnerTotals, data, creatorStats }) {
                 <div key={i} style={S.barRow}>
                   <div style={{ ...S.barLabel, minWidth: 120 }}>{p.name}</div>
                   <div style={S.barTrack}>
-                    <div style={{ ...S.barFill, width: `${(p.count / maxP) * 100}%`, background: "#2D8C5E" }} />
+                    <div style={{ ...S.barFill, width: `${(p.count / maxP) * 100}%`, background: "#16A699" }} />
                   </div>
                   <div style={S.barVal}>{p.count}</div>
                 </div>
@@ -1009,8 +1009,8 @@ function TasksTab({ data, upd, currentUser }) {
         ) : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginTop: 10 }}>
             {campStats.map((c) => (
-              <div key={c.name} style={{ background: "#EDF7F1", border: "1px solid #D6F0EA", borderRadius: 12, padding: 14 }}>
-                <div style={{ fontWeight: 800, color: "#1B5E3B", fontSize: 15, marginBottom: 6 }}>{c.name}</div>
+              <div key={c.name} style={{ background: "#EDEFEF", border: "1px solid #D6F0EA", borderRadius: 12, padding: 14 }}>
+                <div style={{ fontWeight: 800, color: "#16A699", fontSize: 15, marginBottom: 6 }}>{c.name}</div>
                 <div style={{ fontSize: 13, color: "#555" }}>{c.count} كريتور · مستحق ${fmt(c.due)}</div>
               </div>
             ))}
@@ -1033,11 +1033,11 @@ function TasksTab({ data, upd, currentUser }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {tasks.map((t) => (
-              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.done ? "#F0F7F0" : "#fff", border: "1px solid #EBE9E1", borderRadius: 10 }}>
+              <div key={t.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: t.done ? "#F0F7F0" : "#fff", border: "1px solid #D8DCDC", borderRadius: 10 }}>
                 <input type="checkbox" checked={t.done} onChange={() => toggleTask(t.id)} style={{ width: 18, height: 18, cursor: "pointer" }} />
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: 14, textDecoration: t.done ? "line-through" : "none", color: t.done ? "#999" : "#1a1a1a" }}>{t.text}</span>
-                  {t.campaign && <span style={{ marginRight: 8, fontSize: 11, background: "#D4EDE0", color: "#1B5E3B", padding: "2px 8px", borderRadius: 20 }}>{t.campaign}</span>}
+                  {t.campaign && <span style={{ marginRight: 8, fontSize: 11, background: "#EDEFEF", color: "#16A699", padding: "2px 8px", borderRadius: 20 }}>{t.campaign}</span>}
                   {t.by === "admin" && <span style={{ marginRight: 6, fontSize: 11, background: "#FFF1DC", color: "#A86A00", padding: "2px 8px", borderRadius: 20, fontWeight: 700 }}>📌 من الإدارة</span>}
                 </div>
                 <button style={S.iconBtnDanger} onClick={() => delTask(t.id)} title="حذف">✕</button>
@@ -1253,27 +1253,27 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       </tr>`).join("");
     const html = `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>كشف كامبين ${esc(campName)}</title>
     <style>
-      * { font-family: 'Segoe UI', Tahoma, sans-serif; box-sizing: border-box; }
+      * { font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; box-sizing: border-box; }
       body { padding: 32px; color: #1a1a1a; }
-      .head { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #1B5E3B; padding-bottom: 16px; margin-bottom: 8px; }
-      .brand { font-size: 22px; font-weight: 800; color: #1B5E3B; }
+      .head { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #16A699; padding-bottom: 16px; margin-bottom: 8px; }
+      .brand { font-size: 22px; font-weight: 800; color: #16A699; }
       .brand small { display: block; font-size: 12px; color: #888; font-weight: 400; }
-      h1 { font-size: 19px; margin: 18px 0 4px; color: #1B5E3B; }
+      h1 { font-size: 19px; margin: 18px 0 4px; color: #16A699; }
       .meta { color: #666; font-size: 13px; margin-bottom: 18px; }
       .summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
-      .scard { background: #EDF7F1; border: 1px solid #D6F0EA; border-radius: 10px; padding: 12px 18px; flex: 1; min-width: 130px; }
-      .scard .v { font-size: 20px; font-weight: 800; color: #1B5E3B; }
+      .scard { background: #EDEFEF; border: 1px solid #D6F0EA; border-radius: 10px; padding: 12px 18px; flex: 1; min-width: 130px; }
+      .scard .v { font-size: 20px; font-weight: 800; color: #16A699; }
       .scard .l { font-size: 12px; color: #666; margin-top: 2px; }
       table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      th { background: #1B5E3B; color: #fff; padding: 9px 8px; text-align: right; font-weight: 600; }
+      th { background: #16A699; color: #fff; padding: 9px 8px; text-align: right; font-weight: 600; }
       td { padding: 8px; border-bottom: 1px solid #eee; }
       .num { text-align: left; font-variant-numeric: tabular-nums; }
-      .ltr { direction: ltr; text-align: right; font-size: 11px; color: #1B5E3B; }
+      .ltr { direction: ltr; text-align: right; font-size: 11px; color: #16A699; }
       tr:nth-child(even) td { background: #FAFAF8; }
-      tfoot td { font-weight: 800; background: #D4EDE0 !important; border-top: 2px solid #1B5E3B; }
+      tfoot td { font-weight: 800; background: #EDEFEF !important; border-top: 2px solid #16A699; }
       .foot { margin-top: 28px; font-size: 11px; color: #aaa; text-align: center; }
       @media print { body { padding: 12px; } .noprint { display: none; } }
-      .btn { background: #1B5E3B; color:#fff; border:none; padding:10px 22px; border-radius:8px; font-size:14px; cursor:pointer; }
+      .btn { background: #16A699; color:#fff; border:none; padding:10px 22px; border-radius:8px; font-size:14px; cursor:pointer; }
     </style></head><body>
       <div class="head">
         <div class="brand">UGC Iraq<small>المالية الداخلية — كشف كامبين</small></div>
@@ -1437,15 +1437,15 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       <div style={S.tabHead}>
         <SectionTitle noMargin>مدفوعات الكريتورز</SectionTitle>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {importMsg && <span style={{ fontSize: 12.5, fontWeight: 700, color: importMsg.startsWith("✓") ? "#1B5E3B" : "#A32D2D" }}>{importMsg}</span>}
+          {importMsg && <span style={{ fontSize: 12.5, fontWeight: 700, color: importMsg.startsWith("✓") ? "#16A699" : "#D32F2F" }}>{importMsg}</span>}
           <label style={S.ghostBtn}>
             📥 استيراد كريتورز الكامبينات
             <input type="file" accept=".json" onChange={importCampaignCreators} style={{ display: "none" }} />
           </label>
-          <button style={{ ...S.ghostBtn, color: "#1B5E3B", borderColor: "#BCE3D9", display: isStaff ? "none" : undefined }} onClick={() => snapshotToDatabase(false)} title="يحفظ تاريخ الكامبينات بالقاعدة — فقوائم المفضلين والتكرار تصير دائمة">
+          <button style={{ ...S.ghostBtn, color: "#16A699", borderColor: "#BCE3D9", display: isStaff ? "none" : undefined }} onClick={() => snapshotToDatabase(false)} title="يحفظ تاريخ الكامبينات بالقاعدة — فقوائم المفضلين والتكرار تصير دائمة">
             💾 احفظ التاريخ بالقاعدة
           </button>
-          <button style={{ ...S.ghostBtn, color: "#A32D2D", borderColor: "#E8C4C4", display: isStaff ? "none" : undefined }} onClick={clearAllPayments} title="يمسح كل سجلات المدفوعات (القاعدة والكامبينات والتاريخ ما تتأثر)">
+          <button style={{ ...S.ghostBtn, color: "#D32F2F", borderColor: "#E8C4C4", display: isStaff ? "none" : undefined }} onClick={clearAllPayments} title="يمسح كل سجلات المدفوعات (القاعدة والكامبينات والتاريخ ما تتأثر)">
             🗑️ تصفير كل الدفعات
           </button>
           <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
@@ -1472,8 +1472,8 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           {list.length === 0 ? (
             <span style={{ color: "#A8A69C" }}>ماكو نتيجة لـ «{search}»</span>
           ) : (
-            <span style={{ color: "#5F5E5A" }}>
-              <b style={{ color: "#1B5E3B" }}>{list.length}</b> نتيجة
+            <span style={{ color: "#6B7676" }}>
+              <b style={{ color: "#16A699" }}>{list.length}</b> نتيجة
             </span>
           )}
         </div>
@@ -1499,7 +1499,7 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               </div>
               <div style={S.lookupRow}>
                 <span style={S.lookupKey}>🔑 السوبر كي</span>
-                <span style={{ ...S.lookupVal, fontWeight: 700, color: "#1B5E3B" }}>
+                <span style={{ ...S.lookupVal, fontWeight: 700, color: "#16A699" }}>
                   {c.superKey || "—"}
                 </span>
               </div>
@@ -1545,7 +1545,7 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             <button style={S.ghostBtn} onClick={() => { setTransferMode(false); setSelectedT({}); }}>إلغاء</button>
           </>
         )}
-        {transferMsg && <span style={{ fontSize: 13, fontWeight: 600, color: "#1B5E3B" }}>{transferMsg}</span>}
+        {transferMsg && <span style={{ fontSize: 13, fontWeight: 600, color: "#16A699" }}>{transferMsg}</span>}
       </div>
 
       <div style={S.filterRow}>
@@ -1574,8 +1574,8 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       {/* عنوان الكامبين المختار + ملخّص */}
       {campaignFilter !== "all" && (
         <div style={S.campaignSummary}>
-          <span style={{ fontWeight: 700, color: "#1B5E3B" }}>كامبين «{campaignFilter}»</span>
-          <span style={{ color: "#888780", fontSize: 13 }}>
+          <span style={{ fontWeight: 700, color: "#16A699" }}>كامبين «{campaignFilter}»</span>
+          <span style={{ color: "#6B7676", fontSize: 13 }}>
             {(() => {
               const camp = data.creators.filter((c) => (c.campaign || "") === campaignFilter);
               const paid = camp.filter((c) => statusOf(c) === "paid").length;
@@ -1591,7 +1591,7 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           <button style={S.printBtn} onClick={() => printCampaignReport(campaignFilter)}>
             🖨️ كشف PDF
           </button>
-          <button style={{ ...S.printBtn, color: "#A32D2D", borderColor: "#E8C4C4" }} onClick={() => deleteCampaign(campaignFilter)}>
+          <button style={{ ...S.printBtn, color: "#D32F2F", borderColor: "#E8C4C4" }} onClick={() => deleteCampaign(campaignFilter)}>
             🗑️ حذف الكامبين
           </button>
         </div>
@@ -1629,10 +1629,10 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 const st = statusOf(c);
                 const rem = (Number(c.amount) || 0) - (Number(c.paid) || 0);
                 return (
-                  <tr key={c.id} style={{ ...S.tr, ...(transferMode && selectedT[c.id] ? { background: "#EDF7F1" } : {}) }}>
+                  <tr key={c.id} style={{ ...S.tr, ...(transferMode && selectedT[c.id] ? { background: "#EDEFEF" } : {}) }}>
                     {transferMode && (
                       <td style={S.td}>
-                        <input type="checkbox" checked={!!selectedT[c.id]} onChange={() => toggleT(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#1B5E3B" }} />
+                        <input type="checkbox" checked={!!selectedT[c.id]} onChange={() => toggleT(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#16A699" }} />
                       </td>
                     )}
                     <td style={S.td}>
@@ -1669,7 +1669,7 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                     <td style={S.tdMuted}>{c.campaign || "—"}</td>
                     <td style={S.tdNum}>{fmt(c.amount)}</td>
                     <td style={S.tdNum}>{fmt(c.paid)}</td>
-                    <td style={{ ...S.tdNum, color: rem > 0 ? "#A32D2D" : "#888780" }}>
+                    <td style={{ ...S.tdNum, color: rem > 0 ? "#D32F2F" : "#6B7676" }}>
                       {fmt(rem)}
                     </td>
                     <td style={S.td}>
@@ -1882,7 +1882,7 @@ function CampaignsTab({ data, upd, partnerTotals, softDelete }) {
       <div style={S.tabHead}>
         <SectionTitle noMargin>الكامبينات والأرباح</SectionTitle>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {seedMsg && <span style={{ fontSize: 13, fontWeight: 700, color: "#1B5E3B" }}>{seedMsg}</span>}
+          {seedMsg && <span style={{ fontSize: 13, fontWeight: 700, color: "#16A699" }}>{seedMsg}</span>}
           <button style={S.ghostBtn} onClick={seedCampaignNames} title="يضيف أسماء كل الكامبينات من شيتات الدرايف">📥 استيراد أسماء الكامبينات</button>
           <button style={S.primaryBtn} onClick={() => setEditing(blank())}>
             + كامبين جديد
@@ -1994,7 +1994,7 @@ function CampaignForm({ rec, onSave, onCancel }) {
 
       <div style={S.profitBanner}>
         <span>الربح الصافي لهالكامبين</span>
-        <b style={{ color: profit >= 0 ? "#1B5E3B" : "#A32D2D" }}>{fmt(profit)}</b>
+        <b style={{ color: profit >= 0 ? "#16A699" : "#D32F2F" }}>{fmt(profit)}</b>
       </div>
 
       <div style={S.splitHeader}>
@@ -2013,7 +2013,7 @@ function CampaignForm({ rec, onSave, onCancel }) {
         </div>
       ))}
       {r.splits.length > 0 && (
-        <div style={{ ...S.splitTotal, color: totalPct === 100 ? "#1B5E3B" : "#BA7517" }}>
+        <div style={{ ...S.splitTotal, color: totalPct === 100 ? "#16A699" : "#F59E0B" }}>
           مجموع النسب: {totalPct}% {totalPct !== 100 && "(لازم يصير 100%)"}
         </div>
       )}
@@ -2115,7 +2115,7 @@ function ExpensesTab({ data, upd, calc, softDelete }) {
                     </span>
                   </td>
                   <td style={S.tdMuted}>{e.date}</td>
-                  <td style={{ ...S.tdNum, color: "#A32D2D" }}>−{fmt(e.amount)}</td>
+                  <td style={{ ...S.tdNum, color: "#D32F2F" }}>−{fmt(e.amount)}</td>
                   <td style={S.tdAct}>
                     <div style={S.actGroup}>
                       <button style={S.iconBtn} onClick={() => setEditing(e)}>✎</button>
@@ -2352,14 +2352,14 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     if (!win) return;
     win.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>قائمة الكريتورز - UGC Iraq</title>
       <style>
-        *{font-family:'Segoe UI',Tahoma,Arial,sans-serif;box-sizing:border-box}
+        *{font-family:'Archivo',Tahoma,Arial,sans-serif;box-sizing:border-box}
         body{padding:32px;color:#1a1a1a}
-        .head{display:flex;align-items:center;gap:12px;border-bottom:3px solid #2D8C5E;padding-bottom:16px;margin-bottom:20px}
-        .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#2D8C5E,#1B5E3B);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
-        h1{margin:0;font-size:22px;color:#1B5E3B}
+        .head{display:flex;align-items:center;gap:12px;border-bottom:3px solid #16A699;padding-bottom:16px;margin-bottom:20px}
+        .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#16A699,#16A699);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+        h1{margin:0;font-size:22px;color:#16A699}
         .sub{color:#888;font-size:13px;margin-top:2px}
         table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px}
-        th{background:#1B5E3B;color:#fff;padding:9px 8px;text-align:right;font-weight:700}
+        th{background:#16A699;color:#fff;padding:9px 8px;text-align:right;font-weight:700}
         td{padding:8px;border-bottom:1px solid #eee}
         tr:nth-child(even){background:#F7FBFA}
         .foot{margin-top:18px;color:#aaa;font-size:11px;text-align:center}
@@ -2473,7 +2473,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         <span style={S.chatBadge}>{db.length} كريتور بالقاعدة</span>
       </div>
 
-      <p style={{ fontSize: 13.5, color: "#888780", margin: "0 0 16px", lineHeight: 1.7 }}>
+      <p style={{ fontSize: 13.5, color: "#6B7676", margin: "0 0 16px", lineHeight: 1.7 }}>
         هنا دليل كل الكريتورز (اسم، رابط، متابعين) — بدون دفعات. لمن تسوي كامبين، أشّر على الأسماء اللي بالكامبين وأضفهم لمدفوعات الكريتورز بضغطة، بدون ما تعيد كتابتهم.
       </p>
 
@@ -2498,7 +2498,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               const warnOver = wBudget2 > 0 && selCount > 0 && estCost2 > wBudget2;
               const warnCount = wCount2 > 0 && selCount > wCount2;
               if(warnOver) return (
-                <div style={{ padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "#A32D2D", background: "#FFF0F0", borderRadius: 6, border: "1px solid #F5BDBD" }}>
+                <div style={{ padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "#D32F2F", background: "#FFF0F0", borderRadius: 6, border: "1px solid #F5BDBD" }}>
                   ⚠️ تعبرت البدجت! التكلفة المتوقعة <b>{fmt(estCost2)}</b> تتجاوز البدجت <b>{fmt(wBudget2)}</b>.
                 </div>
               );
@@ -2519,7 +2519,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         </label>
         <button style={S.ghostBtn} onClick={printDatabaseList} disabled={list.length === 0}>🖨️ تصدير PDF</button>
         <button style={S.ghostBtn} onClick={() => setShowManageTypes(true)}>🏷️ أنواع المحتوى</button>
-        {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith("\u2713") ? "#1B5E3B" : "#A32D2D" }}>{msg}</span>}
+        {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith("\u2713") ? "#16A699" : "#D32F2F" }}>{msg}</span>}
       </div>
 
       {adding && (
@@ -2539,13 +2539,13 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               </datalist>
               <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={{ fontSize: 12, color: "#888780", marginBottom: 6, display: "block" }}>التخصص / نيش المحتوى (اختر أكثر من واحد)</label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: 10, border: "1px solid #D3D1C7", borderRadius: 9, background: "#FAFAF8", minHeight: 42 }}>
+                <label style={{ fontSize: 12, color: "#6B7676", marginBottom: 6, display: "block" }}>التخصص / نيش المحتوى (اختر أكثر من واحد)</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: 10, border: "1px solid #D8DCDC", borderRadius: 9, background: "#FAFAF8", minHeight: 42 }}>
                   {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t => {
                     const selected = (form.contentTypes||[]).includes(t);
                     return (
                       <button key={t} type="button"
-                        style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: selected ? "1px solid #2D8C5E" : "1px solid #D3D1C7", background: selected ? "#2D8C5E" : "#fff", color: selected ? "#fff" : "#555", fontWeight: selected ? 700 : 400, fontFamily: "inherit" }}
+                        style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: selected ? "1px solid #16A699" : "1px solid #D8DCDC", background: selected ? "#16A699" : "#fff", color: selected ? "#fff" : "#555", fontWeight: selected ? 700 : 400, fontFamily: "inherit" }}
                         onClick={() => {
                           const cur = form.contentTypes || [];
                           const next = cur.includes(t) ? cur.filter(x=>x!==t) : [...cur, t];
@@ -2647,7 +2647,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         ))}
       </div>
       {(followersFilter !== "all" || q) && (
-        <p style={{ fontSize: 12.5, color: "#888780", margin: "0 0 12px" }}>
+        <p style={{ fontSize: 12.5, color: "#6B7676", margin: "0 0 12px" }}>
           النتائج: {list.length} كريتور
         </p>
       )}
@@ -2676,10 +2676,10 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             </thead>
             <tbody>
               {list.map((c) => (
-                <tr key={c.id} style={{ ...S.tr, ...(selectMode && selected[c.id] ? { background: "#EDF7F1" } : {}) }}>
+                <tr key={c.id} style={{ ...S.tr, ...(selectMode && selected[c.id] ? { background: "#EDEFEF" } : {}) }}>
                   {selectMode && (
                     <td style={S.td}>
-                      <input type="checkbox" checked={!!selected[c.id]} onChange={() => toggleSel(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#1B5E3B" }} />
+                      <input type="checkbox" checked={!!selected[c.id]} onChange={() => toggleSel(c.id)} style={{ width: 18, height: 18, cursor: "pointer", accentColor: "#16A699" }} />
                     </td>
                   )}
                   <td style={S.td}>
@@ -2732,9 +2732,9 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                   <td style={S.tdMuted}>
                     <div style={{display:'flex',flexWrap:'wrap',gap:3,alignItems:'center'}}>
                       {(c.contentTypes&&c.contentTypes.length?c.contentTypes:[]).map((nt,ni)=>(
-                        <span key={ni} style={{fontSize:11,background:'#D4EDE0',border:'1px solid #B2DFDB',borderRadius:12,padding:'2px 7px',display:'flex',alignItems:'center',gap:3}}>
+                        <span key={ni} style={{fontSize:11,background:'#EDEFEF',border:'1px solid #B2DFDB',borderRadius:12,padding:'2px 7px',display:'flex',alignItems:'center',gap:3}}>
                           {nt}
-                          <button style={{background:'none',border:'none',cursor:'pointer',color:'#A32D2D',fontWeight:700,fontSize:11,lineHeight:1,padding:'0 1px'}}
+                          <button style={{background:'none',border:'none',cursor:'pointer',color:'#D32F2F',fontWeight:700,fontSize:11,lineHeight:1,padding:'0 1px'}}
                             onClick={()=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,contentTypes:(x.contentTypes||[]).filter((_,ii)=>ii!==ni)}:x)}))}>×</button>
                         </span>
                       ))}
@@ -2812,7 +2812,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         <div style={S.modalOverlay} onClick={() => setShowAssign(false)}>
           <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={S.panelTitle}>أضف {selCount} كريتور لكامبين</div>
-            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 14px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "#6B7676", margin: "0 0 14px", lineHeight: 1.6 }}>
               راح ينضافون لتبويب «مدفوعات الكريتورز» باسم الكامبين والسعر اللي تحدده. تگدر تعدّل سعر كل واحد بعدين من هناك.
             </p>
             <div style={{ marginBottom: 10 }}>
@@ -2840,7 +2840,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         <div style={S.modalOverlay} onClick={() => setShowManageTypes(false)}>
           <div style={{ ...S.modalCard, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div style={S.panelTitle}>🏷️ أنواع المحتوى</div>
-            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 12px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "#6B7676", margin: "0 0 12px", lineHeight: 1.6 }}>
               اختر أو أضف أنواع المحتوى اللي تستخدمها مع الكريتورز.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
@@ -2848,7 +2848,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 <div key={t} style={{ display: "flex", alignItems: "center", gap: 4, background: "#F0F9F8", border: "1px solid #B2DFDB", borderRadius: 20, padding: "4px 10px", fontSize: 13 }}>
                   <span>{t}</span>
                   <button
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#A32D2D", fontWeight: 700, fontSize: 14, lineHeight: 1 }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#D32F2F", fontWeight: 700, fontSize: 14, lineHeight: 1 }}
                     onClick={() => upd(d => ({ ...d, contentTypes: (d.contentTypes && d.contentTypes.length ? d.contentTypes : DEFAULT_CONTENT_TYPES).filter(x => x !== t) }))}
                   >×</button>
                 </div>
@@ -2882,7 +2882,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button style={S.ghostBtn} onClick={() => setShowManageTypes(false)}>إغلاق</button>
-              <button style={{ ...S.ghostBtn, color: "#A32D2D" }} onClick={() => { upd(d => ({ ...d, contentTypes: [...DEFAULT_CONTENT_TYPES] })); }}>إعادة تعيين</button>
+              <button style={{ ...S.ghostBtn, color: "#D32F2F" }} onClick={() => { upd(d => ({ ...d, contentTypes: [...DEFAULT_CONTENT_TYPES] })); }}>إعادة تعيين</button>
             </div>
           </div>
         </div>
@@ -2913,7 +2913,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               {st && st.campaignCount >= 3 && <div style={{ ...S.alertRow, background: "#FFF4DC", borderColor: "#F0DCA8", marginBottom: 12 }}>⭐ كريتور مفضّل — اشتغل وياك {st.campaignCount} كامبينات. ممتاز للتعاون المتكرر.</div>}
               {st && st.thisMonthCount >= 2 && <div style={{ ...S.alertRow, background: "#FFF0E8", borderColor: "#F0C8A8", marginBottom: 12 }}>⚠️ تنبيه إفراط — اشتغل وياك {st.thisMonthCount} مرات هذا الشهر. خفّف حتى ما يحترق تأثيره.</div>}
 
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: "#1B5E3B", margin: "8px 0" }}>الكامبينات اللي اشتغل وياها:</div>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: "#16A699", margin: "8px 0" }}>الكامبينات اللي اشتغل وياها:</div>
               {st && st.prices.length ? (
                 <div style={S.tableWrap}>
                   <table style={S.table}>
@@ -2930,11 +2930,11 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                   </table>
                 </div>
               ) : (
-                <p style={{ fontSize: 13, color: "#888780" }}>ماكو كامبينات مسجّلة لهذا الكريتور بعد (يطلع هنا لمن تضيفه لمدفوعات الكريتورز).</p>
+                <p style={{ fontSize: 13, color: "#6B7676" }}>ماكو كامبينات مسجّلة لهذا الكريتور بعد (يطلع هنا لمن تضيفه لمدفوعات الكريتورز).</p>
               )}
 
               {st && st.prices.length >= 2 && (
-                <p style={{ fontSize: 12.5, color: "#888780", marginTop: 10 }}>
+                <p style={{ fontSize: 12.5, color: "#6B7676", marginTop: 10 }}>
                   💡 تطوّر السعر: من {fmt(st.prices[0].price)} إلى {fmt(st.prices[st.prices.length - 1].price)}
                   {st.prices[st.prices.length - 1].price > st.prices[0].price ? " (غلا ↑)" : st.prices[st.prices.length - 1].price < st.prices[0].price ? " (رخص ↓)" : " (ثابت)"}
                 </p>
@@ -2949,7 +2949,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         <div style={S.modalOverlay} onClick={() => setBlForm(null)}>
           <div style={S.modalCard} onClick={(e) => e.stopPropagation()}>
             <div style={S.panelTitle}>🚫 أضف للبلاك ليست</div>
-            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 14px", lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: "#6B7676", margin: "0 0 14px", lineHeight: 1.6 }}>
               هذا الكريتور ما راح يُقترح بالكامبينات بعد اليوم. اكتب السبب ومنو يضيفه.
             </p>
             <div style={{ marginBottom: 10 }}>
@@ -3773,7 +3773,7 @@ ${JSON.stringify(buildContext())}
                       <span style={{ fontWeight: 700 }}>{m.name}</span>
                       <span style={S.modelBadge}>{m.badge}</span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: "#888780", marginTop: 2 }}>{m.desc}</div>
+                    <div style={{ fontSize: 11.5, color: "#6B7676", marginTop: 2 }}>{m.desc}</div>
                   </button>
                 ))}
               </div>
@@ -3829,7 +3829,7 @@ ${JSON.stringify(buildContext())}
               <span style={S.dot} />
               <span style={{ ...S.dot, animationDelay: "0.2s" }} />
               <span style={{ ...S.dot, animationDelay: "0.4s" }} />
-              <span style={{ marginRight: 8, fontSize: 13, color: "#888780" }}>يفكر...</span>
+              <span style={{ marginRight: 8, fontSize: 13, color: "#6B7676" }}>يفكر...</span>
             </div>
           </div>
         )}
@@ -3880,7 +3880,7 @@ ${JSON.stringify(buildContext())}
       {pendingImg && (
         <div style={S.imgPreview}>
           <img src={pendingImg.dataUrl} alt="مرفق" style={S.imgPreviewThumb} />
-          <span style={{ fontSize: 13, color: "#5F5E5A", flex: 1 }}>
+          <span style={{ fontSize: 13, color: "#6B7676", flex: 1 }}>
             صورة جاهزة للإرسال — اكتب تعليق (اختياري) واضغط إرسال
           </span>
           <button style={S.imgRemove} onClick={() => setPendingImg(null)}>
@@ -3892,7 +3892,7 @@ ${JSON.stringify(buildContext())}
       {pendingCsv && (
         <div style={S.imgPreview}>
           <span style={S.fileChipIcon}>📄</span>
-          <span style={{ fontSize: 13, color: "#5F5E5A", flex: 1 }}>
+          <span style={{ fontSize: 13, color: "#6B7676", flex: 1 }}>
             <b>{pendingCsv.name}</b> — ملف جاهز. اكتب اسم الكامبين (اختياري) واضغط إرسال وآني أعالجه.
           </span>
           <button style={S.imgRemove} onClick={() => setPendingCsv(null)}>
@@ -4007,7 +4007,7 @@ function BlacklistTab({ data, addToBlacklist, removeFromBlacklist }) {
         <button style={S.dangerBtn} onClick={() => setShowForm((v) => !v)}>+ أضف للبلاك ليست</button>
       </div>
 
-      <p style={{ fontSize: 13.5, color: "#888780", margin: "0 0 18px", lineHeight: 1.7 }}>
+      <p style={{ fontSize: 13.5, color: "#6B7676", margin: "0 0 18px", lineHeight: 1.7 }}>
         الكريتورز هنا تعاملهم كان سيّئ أو سوّوا أمور تعبانة. ما راح يُقترحون بالكامبينات، وإذا حاولت تضيفهم راح يطلعلك تحذير. كل واحد مكتوب جنبه السبب ومنو ضافه.
       </p>
 
@@ -4045,10 +4045,10 @@ function BlacklistTab({ data, addToBlacklist, removeFromBlacklist }) {
             <tbody>
               {list.map((b) => (
                 <tr key={b.id} style={S.tr}>
-                  <td style={S.td}><div style={{ ...S.cName, color: "#A32D2D" }}>{b.name || "—"}</div></td>
+                  <td style={S.td}><div style={{ ...S.cName, color: "#D32F2F" }}>{b.name || "—"}</div></td>
                   <td style={S.td}>
                     {b.handle ? (
-                      <a href={toUrl(b.handle)} target="_blank" rel="noopener noreferrer" style={{ ...S.cHandleLink, color: "#A32D2D" }}>{b.handle}</a>
+                      <a href={toUrl(b.handle)} target="_blank" rel="noopener noreferrer" style={{ ...S.cHandleLink, color: "#D32F2F" }}>{b.handle}</a>
                     ) : "—"}
                   </td>
                   <td style={S.tdMuted}>{b.reason || "—"}</td>
@@ -4110,7 +4110,7 @@ function TrashTab({ data, restoreFromTrash, purgeFromTrash, emptyTrash }) {
         )}
       </div>
 
-      <p style={{ fontSize: 13.5, color: "#888780", margin: "0 0 18px", lineHeight: 1.7 }}>
+      <p style={{ fontSize: 13.5, color: "#6B7676", margin: "0 0 18px", lineHeight: 1.7 }}>
         أي شي تحذفه من التطبيق يجي هنا. تگدر تسترجعه لمكانه الأصلي، أو تحذفه نهائياً. (الحذف النهائي ما له رجعة).
       </p>
 
@@ -4227,9 +4227,9 @@ function FirebasePanel({ data, setData }) {
   };
 
   return (
-    <div style={{ ...S.panel, border: connected ? "2px solid #2D8C5E" : "1px solid #EBE9E1", background: connected ? "#EDF7F1" : "#fff" }}>
+    <div style={{ ...S.panel, border: connected ? "2px solid #16A699" : "1px solid #D8DCDC", background: connected ? "#EDEFEF" : "#fff" }}>
       <div style={S.panelTitle}>
-        ☁️ المزامنة السحابية {connected ? <span style={{ fontSize: 12, background: "#2D8C5E", color: "#fff", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>● متصل</span> : <span style={{ fontSize: 12, background: "#E8E6DE", color: "#888", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>غير متصل</span>}
+        ☁️ المزامنة السحابية {connected ? <span style={{ fontSize: 12, background: "#16A699", color: "#fff", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>● متصل</span> : <span style={{ fontSize: 12, background: "#E8E6DE", color: "#888", padding: "3px 10px", borderRadius: 20, marginRight: 8 }}>غير متصل</span>}
       </div>
       <p style={S.settingHint}>
         تربط التطبيق بقاعدة Firebase مجانية، فالداتا تصير <b>أونلاين مشتركة</b> — أي تعديل تسويه يطلع لكل الموظفين لحظياً، وكلكم تشوفون نفس الكريتورز والكامبينات والتاسكات.
@@ -4242,18 +4242,18 @@ function FirebasePanel({ data, setData }) {
         onChange={(e) => setUrl(e.target.value)}
         placeholder="https://your-project-default-rtdb.firebaseio.com"
       />
-      {status && <div style={{ fontSize: 13, fontWeight: 700, color: status.startsWith("✓") ? "#1B5E3B" : status.startsWith("...") ? "#888" : "#A32D2D", margin: "8px 0", lineHeight: 1.5 }}>{status}</div>}
+      {status && <div style={{ fontSize: 13, fontWeight: 700, color: status.startsWith("✓") ? "#16A699" : status.startsWith("...") ? "#888" : "#D32F2F", margin: "8px 0", lineHeight: 1.5 }}>{status}</div>}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
         <button style={S.primaryBtn} onClick={testAndSave} disabled={busy}>🔗 اربط واحفظ</button>
         {connected && <button style={S.secondaryBtn} onClick={pushToCloud} disabled={busy}>⬆ ارفع داتاي للسحابة</button>}
         {connected && <button style={S.ghostBtn} onClick={pullFromCloud} disabled={busy}>⬇ اسحب من السحابة</button>}
-        {connected && <button style={{ ...S.ghostBtn, color: "#A32D2D" }} onClick={disconnect} disabled={busy}>✕ افصل</button>}
+        {connected && <button style={{ ...S.ghostBtn, color: "#D32F2F" }} onClick={disconnect} disabled={busy}>✕ افصل</button>}
       </div>
 
       {!connected && (
         <details style={{ marginTop: 14, fontSize: 13, color: "#555" }}>
-          <summary style={{ cursor: "pointer", fontWeight: 700, color: "#1B5E3B" }}>📖 شلون أسوي قاعدة Firebase مجانية؟ (خطوات)</summary>
+          <summary style={{ cursor: "pointer", fontWeight: 700, color: "#16A699" }}>📖 شلون أسوي قاعدة Firebase مجانية؟ (خطوات)</summary>
           <ol style={{ lineHeight: 1.9, paddingRight: 18, marginTop: 8 }}>
             <li>روح <b>console.firebase.google.com</b> وسجّل دخول بحساب Google</li>
             <li>اضغط «Add project» وسمّي المشروع (مثلاً ugc-iraq)</li>
@@ -4364,41 +4364,41 @@ function StaffManager({ data, upd, staffList }) {
     <div style={S.panel}>
       <div style={S.panelTitle}>👥 إدارة الموظفين</div>
       <p style={S.settingHint}>عدّل أسماء الموظفين ورموزهم، ارفع رتبة موظف لأدمن (يتحكم بكلشي) أو خلّيه موظف عادي (يشوف الكريتورز والتاسكات بس)، خصّص كامبينات، وأضفلهم تاسكات.</p>
-      {msg && <div style={{ fontSize: 13, fontWeight: 700, color: msg.startsWith("✓") ? "#1B5E3B" : "#A32D2D", marginBottom: 10 }}>{msg}</div>}
+      {msg && <div style={{ fontSize: 13, fontWeight: 700, color: msg.startsWith("✓") ? "#16A699" : "#D32F2F", marginBottom: 10 }}>{msg}</div>}
 
       {/* قائمة الموظفين */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 8 }}>
         {list.map((s) => (
-          <div key={s.user} style={{ border: "1px solid #EBE9E1", borderRadius: 12, padding: 14, background: s.role === "admin" ? "#FBF7EE" : "#fff" }}>
+          <div key={s.user} style={{ border: "1px solid #D8DCDC", borderRadius: 12, padding: 14, background: s.role === "admin" ? "#FBF7EE" : "#fff" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 180 }}>
-                <div style={{ fontWeight: 800, color: "#1B5E3B", fontSize: 15 }}>
+                <div style={{ fontWeight: 800, color: "#16A699", fontSize: 15 }}>
                   {s.name}
                   {s.role === "admin" && <span style={{ marginRight: 8, fontSize: 11, background: "#FFE7BA", color: "#A86A00", padding: "2px 10px", borderRadius: 20, fontWeight: 700 }}>👑 أدمن</span>}
                 </div>
-                <div style={{ fontSize: 12.5, color: "#888780", marginTop: 3, direction: "ltr", textAlign: "right" }}>
+                <div style={{ fontSize: 12.5, color: "#6B7676", marginTop: 3, direction: "ltr", textAlign: "right" }}>
                   user: <b>{s.user}</b> · رمز: <b>{s.code}</b>
                 </div>
                 {(s.campaigns || []).length > 0 && (
                   <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 6 }}>
-                    {s.campaigns.map((c) => <span key={c} style={{ fontSize: 11, background: "#D4EDE0", color: "#1B5E3B", padding: "2px 8px", borderRadius: 20 }}>{c}</span>)}
+                    {s.campaigns.map((c) => <span key={c} style={{ fontSize: 11, background: "#EDEFEF", color: "#16A699", padding: "2px 8px", borderRadius: 20 }}>{c}</span>)}
                   </div>
                 )}
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button style={S.miniBtn} onClick={() => { setTaskFor(s); setTaskCamp((s.campaigns || [])[0] || ""); }}>✅ تاسك</button>
                 <button style={S.miniBtn} onClick={() => startEdit(s)}>✎ تعديل</button>
-                <button style={{ ...S.miniBtn, color: s.role === "admin" ? "#A86A00" : "#1B5E3B" }} onClick={() => toggleRole(s)}>
+                <button style={{ ...S.miniBtn, color: s.role === "admin" ? "#A86A00" : "#16A699" }} onClick={() => toggleRole(s)}>
                   {s.role === "admin" ? "↓ موظف" : "↑ أدمن"}
                 </button>
-                <button style={{ ...S.miniBtn, color: "#A32D2D" }} onClick={() => delStaff(s)}>✕</button>
+                <button style={{ ...S.miniBtn, color: "#D32F2F" }} onClick={() => delStaff(s)}>✕</button>
               </div>
             </div>
 
             {/* نموذج إضافة تاسك لهذا الموظف */}
             {taskFor && taskFor.user === s.user && (
-              <div style={{ marginTop: 12, padding: 12, background: "#EDF7F1", borderRadius: 10, border: "1px solid #D6F0EA" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1B5E3B", marginBottom: 8 }}>أضف تاسك لـ«{s.name}»</div>
+              <div style={{ marginTop: 12, padding: 12, background: "#EDEFEF", borderRadius: 10, border: "1px solid #D6F0EA" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#16A699", marginBottom: 8 }}>أضف تاسك لـ«{s.name}»</div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <input style={{ ...S.input, flex: 1, minWidth: 180 }} value={taskText} onChange={(e) => setTaskText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTaskToStaff()} placeholder="اكتب التاسك..." autoFocus />
                   <select style={{ ...S.input, maxWidth: 170 }} value={taskCamp} onChange={(e) => setTaskCamp(e.target.value)}>
@@ -4422,7 +4422,7 @@ function StaffManager({ data, upd, staffList }) {
       {/* نموذج التعديل/الإضافة */}
       {form && (
         <div style={{ marginTop: 14, padding: 16, background: "#F7FBFA", borderRadius: 12, border: "1px solid #D8EFE9" }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#1B5E3B", marginBottom: 12 }}>{editId === "__new__" ? "موظف جديد" : "تعديل موظف"}</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#16A699", marginBottom: 12 }}>{editId === "__new__" ? "موظف جديد" : "تعديل موظف"}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
             <div>
               <label style={S.fieldLabel}>الاسم</label>
@@ -4449,7 +4449,7 @@ function StaffManager({ data, upd, staffList }) {
             {allCampaigns.length === 0 ? <span style={{ fontSize: 12.5, color: "#A8A6A0" }}>ماكو كامبينات بعد</span> : allCampaigns.map((cn) => {
               const sel = (form.campaigns || []).includes(cn);
               return (
-                <button key={cn} onClick={() => toggleCampaign(cn)} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, cursor: "pointer", border: sel ? "1px solid #2D8C5E" : "1px solid #D3D1C7", background: sel ? "#2D8C5E" : "#fff", color: sel ? "#fff" : "#555", fontWeight: sel ? 700 : 400 }}>
+                <button key={cn} onClick={() => toggleCampaign(cn)} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, cursor: "pointer", border: sel ? "1px solid #16A699" : "1px solid #D8DCDC", background: sel ? "#16A699" : "#fff", color: sel ? "#fff" : "#555", fontWeight: sel ? 700 : 400 }}>
                   {sel ? "✓ " : ""}{cn}
                 </button>
               );
@@ -4670,8 +4670,8 @@ function SettingsTab({ data, setData, upd, staffList, isStaff }) {
         </div>
       </div>
 
-      <div style={{ ...S.panel, borderColor: "#8EC9A3" }}>
-        <div style={{ ...S.panelTitle, color: "#1B5E3B" }}>🔗 رابط الخادم (للقراءة التلقائية من Google Sheets)</div>
+      <div style={{ ...S.panel, borderColor: "#D8DCDC" }}>
+        <div style={{ ...S.panelTitle, color: "#16A699" }}>🔗 رابط الخادم (للقراءة التلقائية من Google Sheets)</div>
         <p style={S.settingHint}>
           إذا نشرت الخادم الوسيط (حسب الدليل)، حط رابطه هنا. وقتها المساعد يقرا شيتاتك تلقائياً بدون أي حجب. اتركه فارغ إذا ما عندك خادم — المساعد راح يحاول القراءة المباشرة أو رفع CSV.
         </p>
@@ -4702,7 +4702,7 @@ function SettingsTab({ data, setData, upd, staffList, isStaff }) {
             افحص الاتصال
           </button>
           {srvTest && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: srvTest.startsWith("✓") ? "#1B5E3B" : srvTest.startsWith("✕") ? "#A32D2D" : "#888780" }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: srvTest.startsWith("✓") ? "#16A699" : srvTest.startsWith("✕") ? "#D32F2F" : "#6B7676" }}>
               {srvTest}
             </span>
           )}
@@ -4727,7 +4727,7 @@ function SettingsTab({ data, setData, upd, staffList, isStaff }) {
           </label>
         </div>
         <div style={{ marginTop: 12, padding: 12, background: "#F7FBFA", borderRadius: 10, border: "1px solid #D8EFE9" }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#1B5E3B", marginBottom: 8 }}>طريقة الاستيراد:</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#16A699", marginBottom: 8 }}>طريقة الاستيراد:</div>
           <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 8, cursor: "pointer" }}>
             <input type="radio" name="impmode" checked={importMode === "merge"} onChange={() => setImportMode("merge")} style={{ marginTop: 3 }} />
             <span style={{ fontSize: 13, lineHeight: 1.5 }}><b>دمج شامل بدون تكرار</b> (مُوصى) — استيراد واحد يسوي كلش: يضيف الكريتورز الجداد للقاعدة، يملأ النواقص (متابعين/أرقام/أسعار/محافظات)، يضيف كل الكامبينات بتفاصيلها، ويضيف سجلات المدفوعات — كله بدون تكرار. يحتفظ ببياناتك الحالية.</span>
@@ -4737,8 +4737,8 @@ function SettingsTab({ data, setData, upd, staffList, isStaff }) {
             <span style={{ fontSize: 13, lineHeight: 1.5 }}><b>استبدال كامل</b> — يمسح كل البيانات الحالية ويحطّ محلها الملف. انتبه: ما يرجع.</span>
           </label>
         </div>
-        <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #EBE9E1" }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B5E3B", marginBottom: 6 }}>🔄 نسخة احتياطية تلقائية</div>
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #D8DCDC" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#16A699", marginBottom: 6 }}>🔄 نسخة احتياطية تلقائية</div>
           <p style={S.settingHint}>ينزّل ملف بياناتك تلقائياً كل فترة لمن تفتح التطبيق — حتى ما تنسى. آخر نسخة: {data.lastBackupAt ? new Date(data.lastBackupAt).toLocaleDateString("ar-IQ") : "ماكو بعد"}.</p>
           <select
             value={data.autoBackupDays || 0}
@@ -4803,7 +4803,7 @@ function SectionTitle({ children, noMargin }) {
 
 function StatCard({ label, value, hint, big, tone, raw }) {
   const color =
-    tone === "good" ? "#1B5E3B" : tone === "bad" ? "#A32D2D" : tone === "warn" ? "#854F0B" : "#1B5E3B";
+    tone === "good" ? "#16A699" : tone === "bad" ? "#D32F2F" : tone === "warn" ? "#92400E" : "#16A699";
   return (
     <div style={{ ...S.statCard, ...(big ? S.statCardBig : {}) }}>
       <div style={S.statLabel}>{label}</div>
@@ -4816,7 +4816,7 @@ function StatCard({ label, value, hint, big, tone, raw }) {
 }
 
 function MiniStat({ label, value, tone, raw }) {
-  const color = tone === "good" ? "#1B5E3B" : tone === "bad" ? "#A32D2D" : "#2C2C2A";
+  const color = tone === "good" ? "#16A699" : tone === "bad" ? "#D32F2F" : "#1A1A1A";
   return (
     <div style={S.miniStat}>
       <div style={S.miniLabel}>{label}</div>
@@ -4826,10 +4826,10 @@ function MiniStat({ label, value, tone, raw }) {
 }
 
 function FlowRow({ label, value, bold, tone }) {
-  const color = tone === "good" ? "#1B5E3B" : tone === "bad" ? "#A32D2D" : value < 0 ? "#993C1D" : "#2C2C2A";
+  const color = tone === "good" ? "#16A699" : tone === "bad" ? "#D32F2F" : value < 0 ? "#993C1D" : "#1A1A1A";
   return (
     <div style={{ ...S.flowRow, fontWeight: bold ? 600 : 400 }}>
-      <span style={{ color: "#5F5E5A" }}>{label}</span>
+      <span style={{ color: "#6B7676" }}>{label}</span>
       <span style={{ color, fontVariantNumeric: "tabular-nums" }}>
         {value < 0 ? "−" : ""}{fmt(Math.abs(value))}
       </span>
@@ -4898,14 +4898,14 @@ function Modal({ title, children, onClose, wide }) {
 // ============================================================================
 // الأنماط
 // ============================================================================
-const FONT = "'Segoe UI', 'Tahoma', system-ui, -apple-system, sans-serif";
+const FONT = "'Archivo', 'Tahoma', system-ui, -apple-system, sans-serif";
 
 const S = {
   shell: {
     fontFamily: FONT,
-    background: "#F5F3EE",
+    background: "#FFFFFF",
     minHeight: "100vh",
-    color: "#2C2C2A",
+    color: "#1A1A1A",
     direction: "rtl",
   },
   app: { maxWidth: 1340, margin: "0 auto", padding: "0 24px 60px" },
@@ -4922,7 +4922,7 @@ const S = {
     width: 42,
     height: 42,
     borderRadius: 10,
-    background: "linear-gradient(135deg, #2D8C5E 0%, #1B5E3B 100%)",
+    background: "#16A699",
     color: "#fff",
     display: "flex",
     alignItems: "center",
@@ -4932,22 +4932,22 @@ const S = {
     letterSpacing: 0.5,
   },
   brandName: { fontWeight: 700, fontSize: 17 },
-  brandSub: { fontSize: 12.5, color: "#888780" },
+  brandSub: { fontSize: 12.5, color: "#6B7676" },
   headerRight: { display: "flex", alignItems: "center", gap: 12 },
   logoutBtn: {
     background: "transparent",
-    border: "1px solid #D3D1C7",
+    border: "1px solid #D8DCDC",
     borderRadius: 8,
     padding: "7px 14px",
     fontSize: 13,
     cursor: "pointer",
-    color: "#5F5E5A",
+    color: "#6B7676",
     fontFamily: FONT,
   },
   saveBadge: {
     fontSize: 12,
-    color: "#1B5E3B",
-    background: "#D4EDE0",
+    color: "#16A699",
+    background: "#EDEFEF",
     padding: "4px 10px",
     borderRadius: 99,
   },
@@ -4969,16 +4969,16 @@ const S = {
     borderBottom: "2px solid transparent",
     padding: "12px 14px",
     fontSize: 14,
-    color: "#888780",
+    color: "#6B7676",
     cursor: "pointer",
     whiteSpace: "nowrap",
     fontFamily: FONT,
     fontWeight: 500,
   },
-  tabActive: { color: "#1B5E3B", borderBottom: "2px solid #2D8C5E", fontWeight: 700 },
+  tabActive: { color: "#16A699", borderBottom: "2px solid #16A699", fontWeight: 700 },
 
   main: {},
-  sectionTitle: { fontSize: 19, fontWeight: 700, color: "#2C2C2A", margin: 0 },
+  sectionTitle: { fontSize: 19, fontWeight: 700, color: "#1A1A1A", margin: 0 },
 
   tabHead: {
     display: "flex",
@@ -4998,12 +4998,12 @@ const S = {
   },
   statCard: {
     background: "#fff",
-    border: "1px solid #EBE9E1",
+    border: "1px solid #D8DCDC",
     borderRadius: 14,
     padding: "18px 20px",
   },
-  statCardBig: { gridColumn: "span 1", borderColor: "#8EC9A3", background: "#EDF7F1" },
-  statLabel: { fontSize: 13, color: "#888780", marginBottom: 8 },
+  statCardBig: { gridColumn: "span 1", borderColor: "#D8DCDC", background: "#EDEFEF" },
+  statLabel: { fontSize: 13, color: "#6B7676", marginBottom: 8 },
   statValue: { fontWeight: 800, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 },
   statHint: { fontSize: 12, color: "#A8A69C", marginTop: 7, lineHeight: 1.5 },
 
@@ -5015,17 +5015,17 @@ const S = {
   },
   panel: {
     background: "#fff",
-    border: "1px solid #EBE9E1",
+    border: "1px solid #D8DCDC",
     borderRadius: 14,
     padding: "18px 20px",
     marginBottom: 16,
   },
-  panelTitle: { fontSize: 15, fontWeight: 700, marginBottom: 14, color: "#2C2C2A" },
+  panelTitle: { fontSize: 15, fontWeight: 700, marginBottom: 14, color: "#1A1A1A" },
 
   // bars
   barRow: { display: "flex", alignItems: "center", gap: 12, marginBottom: 11 },
   barLabel: { fontSize: 13.5, minWidth: 80, color: "#444441" },
-  barTrack: { flex: 1, height: 8, background: "#F1EFE8", borderRadius: 99, overflow: "hidden" },
+  barTrack: { flex: 1, height: 8, background: "#EDEFEF", borderRadius: 99, overflow: "hidden" },
   barFill: { height: "100%", borderRadius: 99 },
   barVal: { fontSize: 13.5, fontWeight: 700, minWidth: 70, textAlign: "left", fontVariantNumeric: "tabular-nums" },
 
@@ -5043,7 +5043,7 @@ const S = {
     display: "flex",
     alignItems: "center",
     gap: 10,
-    background: "#FCEBEB",
+    background: "#FEE2E2",
     border: "1px solid #F0997B",
     borderRadius: 12,
     padding: "13px 16px",
@@ -5061,235 +5061,235 @@ const S = {
     padding: "6px 16px",
     fontSize: 13,
     cursor: "pointer",
-    color: "#5F5E5A",
+    color: "#6B7676",
     fontFamily: FONT,
   },
-  chipActive: { background: "#1B5E3B", color: "#fff", borderColor: "#1B5E3B", fontWeight: 600 },
+  chipActive: { background: "#16A699", color: "#fff", borderColor: "#16A699", fontWeight: 600 },
 
-  campaignFilterRow: { display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center", background: "#EDF7F1", border: "1px solid #D6F0EA", borderRadius: 12, padding: "10px 14px" },
-  campaignFilterLabel: { fontSize: 13, fontWeight: 700, color: "#1B5E3B", marginLeft: 4 },
-  campChip: { background: "#fff", border: "1px solid #BFE6DE", borderRadius: 99, padding: "6px 15px", fontSize: 13, cursor: "pointer", color: "#1B5E3B", fontFamily: FONT, fontWeight: 500 },
-  campChipActive: { background: "#2D8C5E", color: "#fff", borderColor: "#2D8C5E", fontWeight: 700 },
-  campaignSummary: { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: "#F5F3EE", border: "1px solid #EBE9E1", borderRadius: 10, padding: "10px 16px", marginBottom: 12 },
-  addToCampBtn: { marginRight: "auto", background: "#2D8C5E", color: "#fff", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
-  printBtn: { background: "#fff", color: "#1B5E3B", border: "1px solid #1B5E3B", borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
-  dbFilterRow: { display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center", background: "#EDF7F1", border: "1px solid #D6F0EA", borderRadius: 12, padding: "10px 14px" },
-  sortSelect: { marginRight: "auto", border: "1px solid #BFE6DE", borderRadius: 9, padding: "7px 12px", fontSize: 13, fontFamily: FONT, color: "#1B5E3B", background: "#fff", cursor: "pointer", outline: "none" },
+  campaignFilterRow: { display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center", background: "#EDEFEF", border: "1px solid #D6F0EA", borderRadius: 12, padding: "10px 14px" },
+  campaignFilterLabel: { fontSize: 13, fontWeight: 700, color: "#16A699", marginLeft: 4 },
+  campChip: { background: "#fff", border: "1px solid #BFE6DE", borderRadius: 99, padding: "6px 15px", fontSize: 13, cursor: "pointer", color: "#16A699", fontFamily: FONT, fontWeight: 500 },
+  campChipActive: { background: "#16A699", color: "#fff", borderColor: "#16A699", fontWeight: 700 },
+  campaignSummary: { display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: "#FFFFFF", border: "1px solid #D8DCDC", borderRadius: 10, padding: "10px 16px", marginBottom: 12 },
+  addToCampBtn: { marginRight: "auto", background: "#16A699", color: "#fff", border: "none", borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
+  printBtn: { background: "#fff", color: "#16A699", border: "1px solid #16A699", borderRadius: 9, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
+  dbFilterRow: { display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center", background: "#EDEFEF", border: "1px solid #D6F0EA", borderRadius: 12, padding: "10px 14px" },
+  sortSelect: { marginRight: "auto", border: "1px solid #BFE6DE", borderRadius: 9, padding: "7px 12px", fontSize: 13, fontFamily: FONT, color: "#16A699", background: "#fff", cursor: "pointer", outline: "none" },
   smartAlert: { display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 10, fontSize: 13.5, lineHeight: 1.5 },
-  smartAlertWarn: { background: "#FAEEDA", border: "1px solid #F0CF9A", color: "#854F0B" },
+  smartAlertWarn: { background: "#FEF3C7", border: "1px solid #F0CF9A", color: "#92400E" },
   smartAlertInfo: { background: "#E9F3FB", border: "1px solid #C3DEF2", color: "#1F5A86" },
   statMiniGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginTop: 12 },
-  statMini: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 12, padding: "16px 18px", textAlign: "center", minWidth: 90 },
-  statMiniVal: { fontSize: 21, fontWeight: 800, color: "#1B5E3B", fontVariantNumeric: "tabular-nums" },
-  statMiniNum: { fontSize: 21, fontWeight: 800, color: "#1B5E3B", fontVariantNumeric: "tabular-nums" },
-  statMiniLbl: { fontSize: 12, color: "#888780", marginTop: 4 },
+  statMini: { background: "#fff", border: "1px solid #D8DCDC", borderRadius: 12, padding: "16px 18px", textAlign: "center", minWidth: 90 },
+  statMiniVal: { fontSize: 21, fontWeight: 800, color: "#16A699", fontVariantNumeric: "tabular-nums" },
+  statMiniNum: { fontSize: 21, fontWeight: 800, color: "#16A699", fontVariantNumeric: "tabular-nums" },
+  statMiniLbl: { fontSize: 12, color: "#6B7676", marginTop: 4 },
 
   // شارات الكريتورز (مفضل / إفراط / محظور)
   badgeFav: { fontSize: 11, fontWeight: 800, color: "#9A6B00", background: "#FFF2CF", border: "1px solid #F0DCA0", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
-  badgeGood: { fontSize: 11, fontWeight: 800, color: "#1B5E3B", background: "#E1F5F0", border: "1px solid #BEE6DD", borderRadius: 20, padding: "2px 8px", whiteSpace: "nowrap" },
+  badgeGood: { fontSize: 11, fontWeight: 800, color: "#16A699", background: "#E1F5F0", border: "1px solid #BEE6DD", borderRadius: 20, padding: "2px 8px", whiteSpace: "nowrap" },
   badgeWarn: { fontSize: 11, fontWeight: 800, color: "#B5651D", background: "#FFE9DC", border: "1px solid #F0C8A8", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
-  badgeBlack: { fontSize: 11, fontWeight: 800, color: "#fff", background: "#A32D2D", border: "1px solid #8A2424", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
+  badgeBlack: { fontSize: 11, fontWeight: 800, color: "#fff", background: "#D32F2F", border: "1px solid #8A2424", borderRadius: 20, padding: "2px 9px", whiteSpace: "nowrap" },
   alertRow: { fontSize: 13, fontWeight: 600, color: "#5A4A2A", background: "#FFF8E8", border: "1px solid #F0E0B8", borderRadius: 10, padding: "10px 14px", lineHeight: 1.6 },
 
   // tables
-  tableWrap: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, overflowX: "auto", overflowY: "hidden" },
+  tableWrap: { background: "#fff", border: "1px solid #D8DCDC", borderRadius: 14, overflowX: "auto", overflowY: "hidden" },
   table: { width: "100%", borderCollapse: "collapse", fontSize: 13.5, minWidth: 900 },
-  th: { textAlign: "right", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#F5F3EE", whiteSpace: "nowrap" },
-  thNum: { textAlign: "left", padding: "12px 16px", fontSize: 12, color: "#888780", fontWeight: 600, borderBottom: "1px solid #EBE9E1", background: "#F5F3EE", whiteSpace: "nowrap" },
-  thAct: { width: 130, minWidth: 130, borderBottom: "1px solid #EBE9E1", background: "#F5F3EE" },
+  th: { textAlign: "right", padding: "12px 16px", fontSize: 12, color: "#6B7676", fontWeight: 600, borderBottom: "1px solid #D8DCDC", background: "#FFFFFF", whiteSpace: "nowrap" },
+  thNum: { textAlign: "left", padding: "12px 16px", fontSize: 12, color: "#6B7676", fontWeight: 600, borderBottom: "1px solid #D8DCDC", background: "#FFFFFF", whiteSpace: "nowrap" },
+  thAct: { width: 130, minWidth: 130, borderBottom: "1px solid #D8DCDC", background: "#FFFFFF" },
   tr: { borderBottom: "1px solid #F4F2EB" },
   td: { padding: "12px 16px", verticalAlign: "middle" },
-  tdMuted: { padding: "12px 16px", color: "#888780", verticalAlign: "middle" },
+  tdMuted: { padding: "12px 16px", color: "#6B7676", verticalAlign: "middle" },
   tdNum: { padding: "12px 16px", textAlign: "left", fontVariantNumeric: "tabular-nums", fontWeight: 600, verticalAlign: "middle" },
   tdAct: { padding: "10px 16px", verticalAlign: "middle", width: 130, minWidth: 130 },
-  cName: { fontWeight: 600, color: "#2C2C2A" },
+  cName: { fontWeight: 600, color: "#1A1A1A" },
   cHandle: { fontSize: 12, color: "#A8A69C", marginTop: 2 },
-  cHandleLink: { fontSize: 12, color: "#2D8C5E", marginTop: 2, textDecoration: "none", display: "inline-block", direction: "ltr", borderBottom: "1px solid transparent" },
-  emptyState: { textAlign: "center", padding: "48px 20px", color: "#A8A6A0", fontSize: 14, background: "#FAF9F6", borderRadius: 12, border: "1px dashed #E0DED6" },
+  cHandleLink: { fontSize: 12, color: "#16A699", marginTop: 2, textDecoration: "none", display: "inline-block", direction: "ltr", borderBottom: "1px solid transparent" },
+  emptyState: { textAlign: "center", padding: "48px 20px", color: "#A8A6A0", fontSize: 14, background: "#FAF9F6", borderRadius: 12, border: "1px dashed #D8DCDC" },
   tdMono: { padding: "12px 16px", color: "#444441", verticalAlign: "middle", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
-  tdKey: { padding: "12px 16px", verticalAlign: "middle", fontWeight: 700, color: "#1B5E3B", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
+  tdKey: { padding: "12px 16px", verticalAlign: "middle", fontWeight: 700, color: "#16A699", fontVariantNumeric: "tabular-nums", direction: "ltr", textAlign: "right", fontSize: 13 },
 
-  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #8EC9A3", borderRadius: 12, padding: "4px 14px", marginBottom: 14 },
+  searchWrap: { display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #D8DCDC", borderRadius: 12, padding: "4px 14px", marginBottom: 14 },
   searchIcon: { fontSize: 15, opacity: 0.6 },
-  searchInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "9px 4px", fontFamily: FONT, background: "transparent", color: "#2C2C2A" },
-  searchClear: { width: 26, height: 26, borderRadius: 7, border: "none", background: "#F1EFE8", cursor: "pointer", fontSize: 12, color: "#888780" },
+  searchInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "9px 4px", fontFamily: FONT, background: "transparent", color: "#1A1A1A" },
+  searchClear: { width: 26, height: 26, borderRadius: 7, border: "none", background: "#EDEFEF", cursor: "pointer", fontSize: 12, color: "#6B7676" },
   lookupBar: { fontSize: 13.5, marginBottom: 12 },
   lookupCards: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12, marginBottom: 20 },
-  lookupCard: { background: "#D4EDE0", border: "1px solid #8EC9A3", borderRadius: 12, padding: "14px 16px" },
-  lookupName: { fontWeight: 700, fontSize: 15.5, color: "#1B5E3B" },
+  lookupCard: { background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 12, padding: "14px 16px" },
+  lookupName: { fontWeight: 700, fontSize: 15.5, color: "#16A699" },
   lookupHandle: { fontSize: 12.5, color: "#5DCAA5", marginTop: 2, marginBottom: 10, direction: "ltr", textAlign: "right" },
   lookupRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: "1px solid #BCEAE1" },
-  lookupKey: { fontSize: 12.5, color: "#1B5E3B" },
-  lookupVal: { fontSize: 14, color: "#2C2C2A", fontVariantNumeric: "tabular-nums", direction: "ltr" },
+  lookupKey: { fontSize: 12.5, color: "#16A699" },
+  lookupVal: { fontSize: 14, color: "#1A1A1A", fontVariantNumeric: "tabular-nums", direction: "ltr" },
 
   actGroup: { display: "flex", gap: 8, justifyContent: "flex-start" },
-  iconBtn: { width: 36, height: 36, borderRadius: 9, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 15, color: "#5F5E5A", flexShrink: 0 },
-  iconBtnGood: { width: 36, height: 36, borderRadius: 9, border: "1px solid #8EC9A3", background: "#D4EDE0", cursor: "pointer", fontSize: 15, color: "#1B5E3B", fontWeight: 700, flexShrink: 0 },
-  iconBtnDanger: { width: 36, height: 36, borderRadius: 9, border: "1px solid #F4C0B3", background: "#FCEBEB", cursor: "pointer", fontSize: 14, color: "#A32D2D", flexShrink: 0 },
+  iconBtn: { width: 36, height: 36, borderRadius: 9, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 15, color: "#6B7676", flexShrink: 0 },
+  iconBtnGood: { width: 36, height: 36, borderRadius: 9, border: "1px solid #D8DCDC", background: "#EDEFEF", cursor: "pointer", fontSize: 15, color: "#16A699", fontWeight: 700, flexShrink: 0 },
+  iconBtnDanger: { width: 36, height: 36, borderRadius: 9, border: "1px solid #F4C0B3", background: "#FEE2E2", cursor: "pointer", fontSize: 14, color: "#D32F2F", flexShrink: 0 },
 
   pill: { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px", borderRadius: 99, fontSize: 12.5, fontWeight: 600 },
 
   statusSelect: { border: "1px solid transparent", borderRadius: 8, padding: "6px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT, appearance: "none", WebkitAppearance: "none", outline: "none", maxWidth: 150 },
   pubCell: { display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" },
-  linkOk: { fontSize: 12, color: "#1B5E3B", background: "#D4EDE0", border: "1px solid #8EC9A3", borderRadius: 7, padding: "3px 9px", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap" },
-  linkMissing: { fontSize: 12, color: "#854F0B", background: "#FAEEDA", border: "1px solid #FAC775", borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap" },
+  linkOk: { fontSize: 12, color: "#16A699", background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 7, padding: "3px 9px", textDecoration: "none", fontWeight: 600, whiteSpace: "nowrap" },
+  linkMissing: { fontSize: 12, color: "#92400E", background: "#FEF3C7", border: "1px solid #FAC775", borderRadius: 7, padding: "3px 9px", cursor: "pointer", fontWeight: 600, fontFamily: FONT, whiteSpace: "nowrap" },
 
   // campaigns
   campList: { display: "flex", flexDirection: "column", gap: 14 },
-  campCard: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, padding: "18px 20px" },
+  campCard: { background: "#fff", border: "1px solid #D8DCDC", borderRadius: 14, padding: "18px 20px" },
   campTop: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 },
-  campName: { fontWeight: 700, fontSize: 16, color: "#2C2C2A" },
-  campClient: { fontSize: 12.5, color: "#888780", marginTop: 3 },
+  campName: { fontWeight: 700, fontSize: 16, color: "#1A1A1A" },
+  campClient: { fontSize: 12.5, color: "#6B7676", marginTop: 3 },
   campStats: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 },
-  miniStat: { background: "#F5F3EE", borderRadius: 10, padding: "11px 13px" },
-  miniLabel: { fontSize: 11.5, color: "#888780", marginBottom: 5 },
+  miniStat: { background: "#FFFFFF", borderRadius: 10, padding: "11px 13px" },
+  miniLabel: { fontSize: 11.5, color: "#6B7676", marginBottom: 5 },
   miniValue: { fontSize: 17, fontWeight: 800, fontVariantNumeric: "tabular-nums" },
 
   splitBox: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14, paddingTop: 14, borderTop: "1px solid #F4F2EB" },
-  splitChip: { display: "flex", alignItems: "center", gap: 8, background: "#D4EDE0", borderRadius: 99, padding: "5px 13px", fontSize: 12.5, color: "#1B5E3B" },
-  splitPct: { fontWeight: 700, color: "#2D8C5E" },
-  splitAmt: { fontWeight: 700, color: "#1B5E3B", borderRight: "1px solid #8EC9A3", paddingRight: 8 },
+  splitChip: { display: "flex", alignItems: "center", gap: 8, background: "#EDEFEF", borderRadius: 99, padding: "5px 13px", fontSize: 12.5, color: "#16A699" },
+  splitPct: { fontWeight: 700, color: "#16A699" },
+  splitAmt: { fontWeight: 700, color: "#16A699", borderRight: "1px solid #D8DCDC", paddingRight: 8 },
 
   // forms
   field: { marginBottom: 14 },
-  fieldLabel: { display: "block", fontSize: 13, color: "#5F5E5A", marginBottom: 6, fontWeight: 600 },
+  fieldLabel: { display: "block", fontSize: 13, color: "#6B7676", marginBottom: 6, fontWeight: 600 },
   input: {
     width: "100%",
     padding: "10px 12px",
-    border: "1px solid #D3D1C7",
+    border: "1px solid #D8DCDC",
     borderRadius: 9,
     fontSize: 14,
     fontFamily: FONT,
     boxSizing: "border-box",
     background: "#fff",
-    color: "#2C2C2A",
+    color: "#1A1A1A",
   },
   formRow: { display: "flex", gap: 12 },
   formActions: { display: "flex", gap: 10, justifyContent: "flex-start", marginTop: 20 },
 
-  primaryBtn: { background: "#1B5E3B", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
-  secondaryBtn: { background: "#fff", color: "#5F5E5A", border: "1px solid #D3D1C7", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
-  smallBtn: { background: "#D4EDE0", color: "#2D8C5E", border: "1px solid #8EC9A3", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
-  dangerBtn: { background: "#FCEBEB", color: "#A32D2D", border: "1px solid #F0997B", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  primaryBtn: { background: "#16A699", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  secondaryBtn: { background: "#fff", color: "#6B7676", border: "1px solid #D8DCDC", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
+  smallBtn: { background: "#EDEFEF", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  dangerBtn: { background: "#FEE2E2", color: "#D32F2F", border: "1px solid #F0997B", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
 
-  profitBanner: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F1EFE8", borderRadius: 10, padding: "12px 16px", fontSize: 14, margin: "6px 0 16px", fontWeight: 600 },
+  profitBanner: { display: "flex", justifyContent: "space-between", alignItems: "center", background: "#EDEFEF", borderRadius: 10, padding: "12px 16px", fontSize: 14, margin: "6px 0 16px", fontWeight: 600 },
 
   splitHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   splitHint: { fontSize: 12.5, color: "#A8A69C", marginBottom: 10 },
   splitRow: { display: "flex", gap: 8, alignItems: "center", marginBottom: 9 },
-  splitCalc: { minWidth: 70, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#1B5E3B", fontVariantNumeric: "tabular-nums" },
+  splitCalc: { minWidth: 70, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#16A699", fontVariantNumeric: "tabular-nums" },
   splitTotal: { fontSize: 13, fontWeight: 600, marginTop: 6 },
 
   // expenses
   typePill: { padding: "3px 11px", borderRadius: 99, fontSize: 12, fontWeight: 600 },
   typeCompany: { background: "#E6F1FB", color: "#185FA5" },
-  typePersonal: { background: "#FAEEDA", color: "#854F0B" },
+  typePersonal: { background: "#FEF3C7", color: "#92400E" },
 
   // settings
-  settingHint: { fontSize: 13, color: "#888780", lineHeight: 1.6, marginBottom: 14 },
+  settingHint: { fontSize: 13, color: "#6B7676", lineHeight: 1.6, marginBottom: 14 },
   dataRow: { display: "flex", gap: 18, marginBottom: 16, flexWrap: "wrap" },
-  dataStat: { fontSize: 13.5, color: "#5F5E5A" },
-  toast: { position: "fixed", bottom: 24, right: 24, background: "#1B5E3B", color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" },
+  dataStat: { fontSize: 13.5, color: "#6B7676" },
+  toast: { position: "fixed", bottom: 24, right: 24, background: "#16A699", color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" },
 
   // empty
   empty: { textAlign: "center", padding: "50px 20px", color: "#A8A69C", fontSize: 14, background: "#fff", border: "1px dashed #E0DED5", borderRadius: 14 },
 
   // chat
-  chatBadge: { fontSize: 12, color: "#1B5E3B", background: "#D4EDE0", padding: "5px 12px", borderRadius: 99, border: "1px solid #8EC9A3" },
+  chatBadge: { fontSize: 12, color: "#16A699", background: "#EDEFEF", padding: "5px 12px", borderRadius: 99, border: "1px solid #D8DCDC" },
 
   chatTopBar: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 8 },
-  modelBtn: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#1B5E3B", background: "#D4EDE0", border: "1px solid #8EC9A3", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
-  modelDot: { width: 8, height: 8, borderRadius: "50%", background: "#2D8C5E", display: "inline-block" },
-  newChatBtn: { fontSize: 13, fontWeight: 700, color: "#fff", background: "#1B5E3B", border: "none", borderRadius: 9, padding: "7px 14px", cursor: "pointer", fontFamily: FONT },
-  convListBtn: { fontSize: 13, fontWeight: 600, color: "#5F5E5A", background: "#F2F1ED", border: "1px solid #E0DED6", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
-  dropdown: { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #E0DED6", borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,0.14)", padding: 8, zIndex: 50, minWidth: 240 },
+  modelBtn: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, color: "#16A699", background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
+  modelDot: { width: 8, height: 8, borderRadius: "50%", background: "#16A699", display: "inline-block" },
+  newChatBtn: { fontSize: 13, fontWeight: 700, color: "#fff", background: "#16A699", border: "none", borderRadius: 9, padding: "7px 14px", cursor: "pointer", fontFamily: FONT },
+  convListBtn: { fontSize: 13, fontWeight: 600, color: "#6B7676", background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 9, padding: "7px 12px", cursor: "pointer", fontFamily: FONT },
+  dropdown: { position: "absolute", top: "calc(100% + 6px)", right: 0, background: "#fff", border: "1px solid #D8DCDC", borderRadius: 12, boxShadow: "0 8px 28px rgba(0,0,0,0.14)", padding: 8, zIndex: 50, minWidth: 240 },
   dropdownTitle: { fontSize: 11, fontWeight: 700, color: "#A8A6A0", padding: "4px 8px 8px", textTransform: "uppercase", letterSpacing: 0.5 },
   modelItem: { display: "block", width: "100%", textAlign: "right", background: "transparent", border: "none", borderRadius: 8, padding: "9px 10px", cursor: "pointer", fontFamily: FONT, marginBottom: 2 },
-  modelItemActive: { background: "#D4EDE0" },
-  modelBadge: { fontSize: 10, fontWeight: 700, color: "#1B5E3B", background: "#D4EDE0", padding: "2px 8px", borderRadius: 99, border: "1px solid #BBE8E0" },
+  modelItemActive: { background: "#EDEFEF" },
+  modelBadge: { fontSize: 10, fontWeight: 700, color: "#16A699", background: "#EDEFEF", padding: "2px 8px", borderRadius: 99, border: "1px solid #BBE8E0" },
   convItem: { display: "flex", alignItems: "center", gap: 4, borderRadius: 8, marginBottom: 2 },
-  convItemActive: { background: "#EDF7F1" },
+  convItemActive: { background: "#EDEFEF" },
   convItemMain: { flex: 1, textAlign: "right", background: "transparent", border: "none", borderRadius: 8, padding: "9px 10px", cursor: "pointer", fontFamily: FONT, overflow: "hidden" },
-  convRenameBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, padding: "6px 7px", borderRadius: 6, flexShrink: 0, color: "#5F5E5A" },
+  convRenameBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 13, padding: "6px 7px", borderRadius: 6, flexShrink: 0, color: "#6B7676" },
   convDelBtn: { background: "transparent", border: "none", cursor: "pointer", fontSize: 14, padding: "6px 8px", borderRadius: 6, flexShrink: 0 },
-  chatWindow: { background: "#F5F3EE", border: "1px solid #EBE9E1", borderRadius: 16, padding: 18, minHeight: 360, maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 },
+  chatWindow: { background: "#FFFFFF", border: "1px solid #D8DCDC", borderRadius: 16, padding: 18, minHeight: 360, maxHeight: 480, overflowY: "auto", display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 },
   aiRow: { display: "flex", gap: 10, alignItems: "flex-start" },
-  aiAvatar: { width: 34, height: 34, borderRadius: 9, background: "linear-gradient(135deg, #2D8C5E 0%, #1B5E3B 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 },
-  aiBubble: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#2C2C2A", maxWidth: "78%" },
-  successBubble: { background: "#D4EDE0", border: "1px solid #8EC9A3", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#1B5E3B", fontWeight: 600, maxWidth: "78%" },
+  aiAvatar: { width: 34, height: 34, borderRadius: 9, background: "#16A699", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 },
+  aiBubble: { background: "#fff", border: "1px solid #D8DCDC", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#1A1A1A", maxWidth: "78%" },
+  successBubble: { background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, color: "#16A699", fontWeight: 600, maxWidth: "78%" },
   userRow: { display: "flex", justifyContent: "flex-start", flexDirection: "row-reverse" },
-  userBubble: { background: "#1B5E3B", color: "#fff", borderRadius: 14, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, maxWidth: "78%" },
-  userImg: { maxWidth: 240, maxHeight: 320, borderRadius: 12, border: "2px solid #8EC9A3", objectFit: "cover" },
-  userFile: { background: "#1B5E3B", color: "#fff", borderRadius: 12, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, fontWeight: 600 },
-  typingBubble: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", display: "flex", alignItems: "center", gap: 5 },
+  userBubble: { background: "#16A699", color: "#fff", borderRadius: 14, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, lineHeight: 1.7, maxWidth: "78%" },
+  userImg: { maxWidth: 240, maxHeight: 320, borderRadius: 12, border: "2px solid #D8DCDC", objectFit: "cover" },
+  userFile: { background: "#16A699", color: "#fff", borderRadius: 12, borderTopLeftRadius: 4, padding: "12px 16px", fontSize: 14, fontWeight: 600 },
+  typingBubble: { background: "#fff", border: "1px solid #D8DCDC", borderRadius: 14, borderTopRightRadius: 4, padding: "12px 16px", display: "flex", alignItems: "center", gap: 5 },
   dot: { width: 7, height: 7, borderRadius: 99, background: "#5DCAA5", display: "inline-block", animation: "ugcblink 1.4s infinite both" },
 
-  confirmCard: { background: "#fff", border: "2px solid #8EC9A3", borderRadius: 14, borderTopRightRadius: 4, padding: "16px 18px", maxWidth: "82%", minWidth: 280 },
-  confirmHead: { fontSize: 14, fontWeight: 700, color: "#1B5E3B", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid #D4EDE0" },
+  confirmCard: { background: "#fff", border: "2px solid #D8DCDC", borderRadius: 14, borderTopRightRadius: 4, padding: "16px 18px", maxWidth: "82%", minWidth: 280 },
+  confirmHead: { fontSize: 14, fontWeight: 700, color: "#16A699", marginBottom: 12, paddingBottom: 10, borderBottom: "1px solid #EDEFEF" },
   confirmRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", fontSize: 14 },
-  confirmKey: { color: "#888780", fontSize: 13 },
+  confirmKey: { color: "#6B7676", fontSize: 13 },
   confirmActions: { display: "flex", gap: 8, marginTop: 14 },
-  confirmBtn: { flex: 1, background: "#1B5E3B", color: "#fff", border: "none", borderRadius: 9, padding: "11px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT },
-  confirmCancel: { background: "#fff", color: "#888780", border: "1px solid #D3D1C7", borderRadius: 9, padding: "11px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  confirmBtn: { flex: 1, background: "#16A699", color: "#fff", border: "none", borderRadius: 9, padding: "11px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT },
+  confirmCancel: { background: "#fff", color: "#6B7676", border: "1px solid #D8DCDC", borderRadius: 9, padding: "11px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
 
-  chatInputBar: { display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #EBE9E1", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
-  uploadBtn: { background: "#D4EDE0", color: "#1B5E3B", border: "1px solid #8EC9A3", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  chatInputBar: { display: "flex", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #D8DCDC", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
+  uploadBtn: { background: "#EDEFEF", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
   pasteHint: { fontSize: 13, color: "#A8A69C" },
-  chatNote: { fontSize: 13, color: "#5F5E5A", background: "#EDF7F1", border: "1px solid #8EC9A3", borderRadius: 10, padding: "12px 16px", lineHeight: 1.6 },
+  chatNote: { fontSize: 13, color: "#6B7676", background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 10, padding: "12px 16px", lineHeight: 1.6 },
 
-  reminderCard: { background: "#FAEEDA", border: "1px solid #FAC775", borderRadius: 12, padding: "14px 16px", marginBottom: 12 },
+  reminderCard: { background: "#FEF3C7", border: "1px solid #FAC775", borderRadius: 12, padding: "14px 16px", marginBottom: 12 },
   reminderTop: { display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 12 },
   reminderIcon: { fontSize: 18, flexShrink: 0 },
-  reminderTitle: { fontSize: 14, fontWeight: 700, color: "#854F0B", marginBottom: 4 },
+  reminderTitle: { fontSize: 14, fontWeight: 700, color: "#92400E", marginBottom: 4 },
   reminderText: { fontSize: 13, color: "#7A4B0C", lineHeight: 1.6 },
   reminderActions: { display: "flex", gap: 8, flexWrap: "wrap" },
-  reminderLink: { fontSize: 13, color: "#854F0B", background: "#fff", border: "1px solid #FAC775", borderRadius: 8, padding: "8px 14px", textDecoration: "none", fontWeight: 600 },
-  reminderDone: { fontSize: 13, color: "#fff", background: "#BA7517", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontFamily: FONT },
-  reminderLater: { fontSize: 13, color: "#854F0B", background: "transparent", border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 600, fontFamily: FONT },
+  reminderLink: { fontSize: 13, color: "#92400E", background: "#fff", border: "1px solid #FAC775", borderRadius: 8, padding: "8px 14px", textDecoration: "none", fontWeight: 600 },
+  reminderDone: { fontSize: 13, color: "#fff", background: "#F59E0B", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontWeight: 700, fontFamily: FONT },
+  reminderLater: { fontSize: 13, color: "#92400E", background: "transparent", border: "none", borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontWeight: 600, fontFamily: FONT },
 
   quickRow: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 },
-  quickChip: { background: "#fff", color: "#1B5E3B", border: "1px solid #8EC9A3", borderRadius: 99, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONT },
+  quickChip: { background: "#fff", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 99, padding: "8px 14px", fontSize: 13, cursor: "pointer", fontFamily: FONT },
 
-  composer: { display: "flex", alignItems: "flex-end", gap: 8, background: "#fff", border: "1px solid #8EC9A3", borderRadius: 14, padding: "8px 10px", marginBottom: 12 },
-  attachBtn: { width: 40, height: 40, borderRadius: 10, border: "1px solid #E0DED5", background: "#F5F3EE", cursor: "pointer", fontSize: 18, flexShrink: 0 },
-  composerInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "10px 6px", fontFamily: FONT, background: "transparent", color: "#2C2C2A", resize: "none", lineHeight: 1.5, maxHeight: 120 },
-  sendBtn: { background: "#1B5E3B", color: "#fff", border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, flexShrink: 0, height: 40 },
+  composer: { display: "flex", alignItems: "flex-end", gap: 8, background: "#fff", border: "1px solid #D8DCDC", borderRadius: 14, padding: "8px 10px", marginBottom: 12 },
+  attachBtn: { width: 40, height: 40, borderRadius: 10, border: "1px solid #E0DED5", background: "#FFFFFF", cursor: "pointer", fontSize: 18, flexShrink: 0 },
+  composerInput: { flex: 1, border: "none", outline: "none", fontSize: 15, padding: "10px 6px", fontFamily: FONT, background: "transparent", color: "#1A1A1A", resize: "none", lineHeight: 1.5, maxHeight: 120 },
+  sendBtn: { background: "#16A699", color: "#fff", border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, flexShrink: 0, height: 40 },
 
-  imgPreview: { display: "flex", alignItems: "center", gap: 12, background: "#EDF7F1", border: "1px solid #8EC9A3", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
-  imgPreviewThumb: { width: 48, height: 48, borderRadius: 8, objectFit: "cover", border: "1px solid #8EC9A3" },
+  imgPreview: { display: "flex", alignItems: "center", gap: 12, background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 12, padding: "10px 14px", marginBottom: 12 },
+  imgPreviewThumb: { width: 48, height: 48, borderRadius: 8, objectFit: "cover", border: "1px solid #D8DCDC" },
   fileChipIcon: { fontSize: 26, flexShrink: 0 },
-  imgRemove: { width: 28, height: 28, borderRadius: 7, border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: "#888780", flexShrink: 0 },
+  imgRemove: { width: 28, height: 28, borderRadius: 7, border: "none", background: "#fff", cursor: "pointer", fontSize: 13, color: "#6B7676", flexShrink: 0 },
 
-  actionCard: { display: "flex", alignItems: "flex-start", gap: 10, background: "#D4EDE0", border: "1px solid #8EC9A3", borderRadius: 14, borderTopRightRadius: 4, padding: "11px 15px", fontSize: 14, color: "#1B5E3B", fontWeight: 500, lineHeight: 1.6, maxWidth: "82%" },
-  actionDot: { width: 20, height: 20, borderRadius: 99, background: "#1D9E75", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1 },
+  actionCard: { display: "flex", alignItems: "flex-start", gap: 10, background: "#EDEFEF", border: "1px solid #D8DCDC", borderRadius: 14, borderTopRightRadius: 4, padding: "11px 15px", fontSize: 14, color: "#16A699", fontWeight: 500, lineHeight: 1.6, maxWidth: "82%" },
+  actionDot: { width: 20, height: 20, borderRadius: 99, background: "#16A699", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1 },
 
   // modal
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(15,45,30,0.55)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto" },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto" },
   modalCard: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", padding: 24 },
-  ghostBtn: { background: "transparent", color: "#888780", border: "1px solid #E0DED6", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
-  miniBtn: { background: "#fff", color: "#1B5E3B", border: "1px solid #D3D1C7", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
+  ghostBtn: { background: "transparent", color: "#6B7676", border: "1px solid #D8DCDC", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  miniBtn: { background: "#fff", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
   waLink: { color: "#1FA958", textDecoration: "none", direction: "ltr", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 },
-  undoBar: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#1B5E3B", color: "#fff", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 10px 30px rgba(15,45,30,0.35)", zIndex: 200, fontFamily: FONT, maxWidth: "90vw" },
+  undoBar: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#16A699", color: "#fff", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 10px 30px rgba(15,45,30,0.35)", zIndex: 200, fontFamily: FONT, maxWidth: "90vw" },
   undoText: { fontSize: 14, fontWeight: 500 },
-  undoBtn: { background: "#fff", color: "#1B5E3B", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
-  undoClose: { background: "transparent", color: "#8EC9A3", border: "none", cursor: "pointer", fontSize: 14, padding: "4px 6px" },
-  trashKindPill: { fontSize: 11.5, fontWeight: 700, color: "#5F5E5A", background: "#F2F1ED", padding: "3px 10px", borderRadius: 99, border: "1px solid #E0DED6", whiteSpace: "nowrap" },
-  restoreBtn: { background: "#D4EDE0", color: "#1B5E3B", border: "1px solid #8EC9A3", borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
+  undoBtn: { background: "#fff", color: "#16A699", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
+  undoClose: { background: "transparent", color: "#D8DCDC", border: "none", cursor: "pointer", fontSize: 14, padding: "4px 6px" },
+  trashKindPill: { fontSize: 11.5, fontWeight: 700, color: "#6B7676", background: "#EDEFEF", padding: "3px 10px", borderRadius: 99, border: "1px solid #D8DCDC", whiteSpace: "nowrap" },
+  restoreBtn: { background: "#EDEFEF", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
   modal: { background: "#fff", borderRadius: 16, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", display: "flex", flexDirection: "column" },
-  modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: "1px solid #EBE9E1" },
-  modalTitle: { fontSize: 16, fontWeight: 700, color: "#2C2C2A" },
-  modalClose: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#888780" },
+  modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: "1px solid #D8DCDC" },
+  modalTitle: { fontSize: 16, fontWeight: 700, color: "#1A1A1A" },
+  modalClose: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#6B7676" },
   modalBody: { padding: 22, overflowY: "auto" },
 
   // lock
-  lockWrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
-  lockCard: { background: "#fff", border: "1px solid #EBE9E1", borderRadius: 18, padding: "40px 36px", textAlign: "center", maxWidth: 360, width: "100%", boxShadow: "0 8px 40px rgba(15,60,35,0.08)" },
-  lockIcon: { fontSize: 36, marginBottom: 14 },
-  lockTitle: { fontSize: 21, fontWeight: 800, color: "#1B5E3B", margin: "0 0 8px" },
-  lockSub: { fontSize: 13.5, color: "#888780", margin: "0 0 24px", lineHeight: 1.6 },
-  lockInput: { width: "100%", padding: "13px", border: "1px solid #D3D1C7", borderRadius: 11, fontSize: 22, textAlign: "center", letterSpacing: 8, fontFamily: FONT, boxSizing: "border-box", marginBottom: 12 },
-  lockErr: { color: "#A32D2D", fontSize: 13, marginBottom: 12 },
-  lockBtn: { width: "100%", background: "#1B5E3B", color: "#fff", border: "none", borderRadius: 11, padding: "13px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: FONT },
+  lockWrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "#FFFFFF" },
+  lockCard: { background: "#FFFFFF", border: "1px solid #D8DCDC", borderRadius: 12, padding: "48px 40px", textAlign: "center", maxWidth: 380, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" },
+  lockIcon: { fontSize: 36, marginBottom: 16, color: "#16A699" },
+  lockTitle: { fontSize: 21, fontWeight: 800, color: "#16A699", margin: "0 0 8px" },
+  lockSub: { fontSize: 13.5, color: "#6B7676", margin: "0 0 28px", lineHeight: 1.6, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
+  lockInput: { width: "100%", padding: "14px", border: "2px solid #D8DCDC", borderRadius: 8, fontSize: 20, textAlign: "center", letterSpacing: 8, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", boxSizing: "border-box", marginBottom: 14, outline: "none", transition: "border-color 0.2s" },
+  lockErr: { color: "#EF4444", fontSize: 13, marginBottom: 12, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
+  lockBtn: { width: "100%", background: "#16A699", color: "#FFFFFF", border: "none", borderRadius: 8, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
 };
 
 
