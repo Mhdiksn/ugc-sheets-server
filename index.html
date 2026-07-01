@@ -33,21 +33,28 @@
   }
   [data-theme="dark"] body,
   [data-theme="dark"] html { background: #1A1A1A !important; color: #FFFFFF !important; }
-  [data-theme="dark"] #boot { background: #1A1A1A !important; }
-  [data-theme="dark"] #boot .spin { border-color: #333; border-top-color: #16A699; }
+  [data-theme="dark"] #root { background: #1A1A1A !important; }
+  [data-theme="dark"] .spin { border-color: #333; border-top-color: #16A699; }
   [data-theme="dark"] div[style*="background: \"#FFFFFF\""],
-  [data-theme="dark"] div[style*='background: "#FFFFFF"'] { background: #242424 !important; }
+  [data-theme="dark"] div[style*='background: "#FFFFFF"'],
+  [data-theme="dark"] div[style*="backgroundColor: \"#FFFFFF\""] { background: #242424 !important; }
   [data-theme="dark"] div[style*="color: \"#1A1A1A\""],
   [data-theme="dark"] div[style*='color: "#1A1A1A"'] { color: #FFFFFF !important; }
   [data-theme="dark"] div[style*="background: \"#EDEFEF\""],
-  [data-theme="dark"] div[style*='background: "#EDEFEF"'] { background: #2A2A2A !important; }
+  [data-theme="dark"] div[style*='background: "#EDEFEF"'] { background: #1A1A1A !important; }
   [data-theme="dark"] div[style*="background: \"#F8F9FA\""],
   [data-theme="dark"] div[style*='background: "#F8F9FA"'] { background: #1E1E1E !important; }
+  [data-theme="dark"] div[style*="background: \"#F5F5F5\""],
+  [data-theme="dark"] div[style*='background: "#F5F5F5"'] { background: #1E1E1E !important; }
   [data-theme="dark"] td, [data-theme="dark"] th { border-color: #333 !important; color: #FFFFFF !important; }
-  [data-theme="dark"] table { background: #242424 !important; }
+  [data-theme="dark"] table { background: #242424 !important; color: #FFFFFF !important; border-color: #444 !important; }
   [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
     background: #2A2A2A !important; color: #FFFFFF !important; border-color: #444 !important;
   }
+  [data-theme="dark"] span[style*="color: \"#1A1A1A\""] { color: #FFFFFF !important; }
+  [data-theme="dark"] span[style*="color: \"#6B7676\""] { color: #A0A0A0 !important; }
+  [data-theme="dark"] p[style*="color: \"#1A1A1A\""] { color: #FFFFFF !important; }
+  [data-theme="dark"] p[style*="color: \"#6B7676\""] { color: #A0A0A0 !important; }
 </style>
 </head>
 <body>
@@ -287,6 +294,7 @@ function App() {
   const [authed, setAuthed] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [rememberMe, setRememberMe] = React.useState(() => localStorage.getItem('ugc_remembered') === '1');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('ugc_theme') === 'dark');
   const [currentUser, setCurrentUser] = useState(null); // null=الأدمن الرئيسي، أو كائن الموظف
 
@@ -627,7 +635,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
     // يتحقق من رمز الأدمن أو رمز أي موظف
     const tryLogin = () => {
       const code = pinInput.trim();
-      if (code === PIN) { setCurrentUser(null); setAuthed(true); return; }
+      if (code === PIN) { setCurrentUser(null); setAuthed(true); if (rememberMe) { localStorage.setItem('ugc_remembered', '1'); } else { localStorage.removeItem('ugc_remembered'); } return; }
       const staff = staffList.find((s) => s.code.toLowerCase() === code.toLowerCase() || s.user.toLowerCase() === code.toLowerCase());
       if (staff) { setCurrentUser(staff); setAuthed(true); return; }
       setPinErr(true);
@@ -664,6 +672,16 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
               autoFocus
             />
             {pinErr && <div style={S.lockErr}>INVALID CODE — TRY AGAIN.</div>}
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                style={{width:16,height:16,accentColor:'#16A699',cursor:'pointer'}}
+              />
+              <label htmlFor="rememberMe" style={{fontSize:12,color:darkMode?'#A0A0A0':'#6B7676',cursor:'pointer',fontFamily:'Archivo,sans-serif',letterSpacing:1}}>REMEMBER ME</label>
+            </div>
             <button style={{...S.lockBtn}} onClick={tryLogin}>
               ENTER
             </button>
