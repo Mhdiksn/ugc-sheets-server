@@ -259,7 +259,7 @@ function App() {
     (async () => {
       const d = await loadAll();
       if (d) setData({ ...EMPTY, ...d });
-setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb.refFromURL(_fbu+'/ugcData').on('value',function(sn){var dv=sn.val();if(dv&&typeof dv==='object'&&(dv._updatedAt||0)>(window._myLastFbUpdate||0)){window._myLastFbUpdate=dv._updatedAt;setData(function(){return Object.assign({},EMPTY,dv);})}});}}
+setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb.refFromURL(_fbu+'/ugcData').on('value',function(sn){var dv=sn.val();if(dv&&typeof dv==='object'&&(dv._updatedAt||0)>(window._myLastFbUpdate||0)){window._myLastFbUpdate=dv._updatedAt;window._fbLastApply=Date.now();setData(function(){return Object.assign({},EMPTY,dv);})}});}}
     })();
   }, []);
 
@@ -267,6 +267,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
   const lastSaveAt = useRef(0);
   useEffect(() => {
     if (!loaded) return;
+  if(Date.now()-(window._fbLastApply||0)<3000)return;
     setSaveState("saving");
     const t = setTimeout(async () => {
       lastSaveAt.current = Date.now();
