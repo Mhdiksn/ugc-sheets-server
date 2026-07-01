@@ -2177,6 +2177,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState({});
   const [showAssign, setShowAssign] = useState(false);
+  const [msg, setMsg] = useState("");
   const [showCampaignWizard, setShowCampaignWizard] = useState(false);
   const [campaignWizard, setCampaignWizard] = useState({ campaign: "", budget: "", creatorCount: "", contentType: "", amount: "", deadline: "" });
   const [showManageTypes, setShowManageTypes] = useState(false);
