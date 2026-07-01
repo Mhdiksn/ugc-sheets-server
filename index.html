@@ -636,7 +636,19 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
       <Shell>
         <div style={{...S.lockWrap, background: darkMode ? "#1A1A1A" : "#FFFFFF"}}>
           <div style={{...S.lockCard, background: darkMode ? "#242424" : "#FFFFFF", border: darkMode ? "1px solid #333333" : "1px solid #D8DCDC", position: "relative"}}>
-            <div style={S.lockIcon}><svg width="72" height="44" viewBox="0 0 160 96" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto"><g fill="#16A699"><rect x="4" y="4" width="14" height="44" rx="4"/><rect x="4" y="44" width="38" height="14" rx="7"/><rect x="30" y="4" width="14" height="44" rx="4"/><rect x="60" y="4" width="14" height="14"/><rect x="60" y="4" width="14" height="58" rx="4"/><rect x="60" y="48" width="40" height="14" rx="4"/><rect x="86" y="4" width="14" height="26" rx="4"/><rect x="86" y="48" width="14" height="14"/><rect x="60" y="4" width="40" height="14" rx="4"/><path d="M116 4 Q116 0 120 0 Q160 0 160 48 Q160 96 120 96 Q116 96 116 92 L116 78 Q116 82 120 82 Q144 82 144 48 Q144 14 120 14 Q116 14 116 18 Z"/></g></svg></div>
+            <div style={S.lockIcon}>
+              <svg width="80" height="48" viewBox="0 0 120 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="11" height="38" rx="3" fill="#16A699"/>
+                <rect x="3" y="38" width="30" height="11" rx="5.5" fill="#16A699"/>
+                <rect x="22" y="3" width="11" height="38" rx="3" fill="#16A699"/>
+                <rect x="46" y="3" width="11" height="11" fill="#16A699"/>
+                <rect x="46" y="3" width="11" height="47" rx="3" fill="#16A699"/>
+                <rect x="46" y="39" width="32" height="11" rx="3" fill="#16A699"/>
+                <rect x="67" y="3" width="11" height="22" rx="3" fill="#16A699"/>
+                <rect x="46" y="3" width="32" height="11" rx="3" fill="#16A699"/>
+                <path d="M89 3 Q89 0 93 0 Q120 0 120 36 Q120 72 93 72 Q89 72 89 69 L89 58 Q89 61 93 61 Q109 61 109 36 Q109 11 93 11 Q89 11 89 14 Z" fill="#16A699"/>
+              </svg>
+            </div>
             <h1 style={{...S.lockTitle, color: darkMode ? "#16A699" : "#16A699"}}>UGC Iraq</h1>
             <button onClick={() => setDarkMode(d => !d)} title="Toggle theme" style={{
               position: 'absolute', top: 16, right: 16,
