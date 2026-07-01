@@ -26,9 +26,28 @@
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+ <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="text/plain" id="app-source">
+
+ // ── Firebase Anonymous Auth ──────────────────────────────────────────────────
+ const _fbConfig = {
+   apiKey: "AIzaSyDhAARa2PPP_gSTm5D-z3UnntRXgGwhhVw",
+   authDomain: "ugc-iraq.firebaseapp.com",
+   databaseURL: "https://ugc-iraq-default-rtdb.firebaseio.com",
+   projectId: "ugc-iraq",
+   storageBucket: "ugc-iraq.firebasestorage.app",
+   messagingSenderId: "27994174062",
+   appId: "1:27994174062:web:92ded0da6a367f774d6c7f"
+ if (!firebase.apps.length) { firebase.initializeApp(_fbConfig); }
+ const _fbAuth = firebase.auth();
+ _fbAuth.signInAnonymously().catch(e => console.error("Firebase auth error:", e));
+ async function getFirebaseToken() {
+   try { const u = _fbAuth.currentUser; return u ? await u.getIdToken() : ""; } catch(e) { return ""; }
+ }
+ };
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
 
@@ -132,7 +151,7 @@ async function loadAll() {
   const fb = getFirebaseURL();
   if (fb) {
     try {
-      const resp = await fetch(`${fb}/ugcData.json`);
+      const resp = await fetch(`${fb}/ugcData.json?auth=${await getFirebaseToken()}`);
       if (resp.ok) {
         const remote = await resp.json();
         if (remote && typeof remote === "object") {
@@ -164,7 +183,7 @@ async function saveAll(data) {
   const fb = getFirebaseURL();
   if (fb) {
     try {
-      const resp = await fetch(`${fb}/ugcData.json`, {
+      const resp = await fetch(`${fb}/ugcData.json?auth=${await getFirebaseToken()}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...data, _updatedAt: Date.now() }),
