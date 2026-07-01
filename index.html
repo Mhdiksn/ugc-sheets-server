@@ -196,6 +196,7 @@ async function fetchRemoteUpdatedAt() {
   return null;
 }
 
+const DEFAULT_CONTENT_TYPES = ["ريلز", "ستوري", "تيك توك", "يوتيوب شورت", "بوست ثابت", "لايف", "فيديو يوتيوب", "بودكاست"];
 // ---- بيانات افتراضية فارغة -------------------------------------------------
 const EMPTY = {
   creators: [], // {id, name, handle, phone, superKey, campaign, amount, paid, payStatus, pubStatus, pubLink, date, note}
@@ -208,6 +209,7 @@ const EMPTY = {
   staff: null, // حسابات الموظفين (null = استخدم الافتراضي DEFAULT_STAFF)
   capital: 0, // رأس مال / رصيد الشركة الابتدائي
   serverUrl: "", // رابط الخادم الوسيط لقراءة Google Sheets (اختياري)
+  contentTypes: [], // قائمة أنواع المحتوى المخصصة
   conversations: [], // محادثات المساعد: {id, title, messages:[], apiHistory:[], model, createdAt}
   activeConvId: null, // المحادثة المفتوحة حالياً
   defaultModel: "claude-sonnet-4-6", // الموديل الافتراضي للمحادثات الجديدة
@@ -2171,13 +2173,14 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   const [specialFilter, setSpecialFilter] = useState("all"); // all | favorites | available
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "" });
+  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", contentType: "" });
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState({});
   const [showAssign, setShowAssign] = useState(false);
-  const [assign, setAssign] = useState({ campaign: "", amount: "" });
-  const [msg, setMsg] = useState("");
-  const [blForm, setBlForm] = useState(null); // {name, handle, reason, addedBy} لمودال البلاك ليست
+  const [showCampaignWizard, setShowCampaignWizard] = useState(false);
+  const [campaignWizard, setCampaignWizard] = useState({ campaign: "", budget: "", creatorCount: "", contentType: "", amount: "", deadline: "" });
+  const [showManageTypes, setShowManageTypes] = useState(false);
+  const [newTypeInput, setNewTypeInput] = useState("");
   const [historyOf, setHistoryOf] = useState(null); // كريتور لعرض سجله
 
   // شرائح فلتر المتابعين
@@ -2190,7 +2193,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     { id: "500+", label: "أكثر من 500K", min: 500000, max: Infinity },
   ];
 
-  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "" });
+  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", contentType: "" });
 
   const saveCreator = () => {
     if (!form.name.trim() && !form.handle.trim()) {
@@ -2209,6 +2212,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           c.lastPrice = Number(form.lastPrice) || 0;
           c.province = (form.province || "").trim();
           c.note = form.note.trim();
+          c.contentType = form.contentType || "";
         }
         return d;
       });
@@ -2223,6 +2227,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         lastPrice: Number(form.lastPrice) || 0,
         province: (form.province || "").trim(),
         note: form.note.trim(),
+        contentType: form.contentType || "",
       };
       upd((d) => {
         d.creatorsDB = [item, ...(d.creatorsDB || [])];
@@ -2234,7 +2239,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   };
 
   const startEdit = (c) => {
-    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", province: c.province || "", note: c.note || "" });
+    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", province: c.province || "", note: c.note || "", contentType: c.contentType || "" });
     setEditId(c.id);
     setAdding(true);
   };
@@ -2457,14 +2462,27 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           + كريتور للقاعدة
         </button>
         {!selectMode ? (
-          <button style={S.secondaryBtn} onClick={() => setSelectMode(true)} disabled={db.length === 0}>
-            ☑ اختر كريتورز لكامبين
+          <button style={S.secondaryBtn} onClick={() => setShowCampaignWizard(true)} disabled={db.length === 0}>
+            🚀 سوي كامبين جديد
           </button>
         ) : (
           <>
             <button style={S.primaryBtn} onClick={() => setShowAssign(true)} disabled={selCount === 0}>
               أضف {selCount} لكامبين ←
             </button>
+            {(() => {
+              const wBudget2 = Number(campaignWizard.budget) || 0;
+              const wAmt2 = Number(campaignWizard.amount) || 0;
+              const wCount2 = Number(campaignWizard.creatorCount) || 0;
+              const estCost2 = selCount * wAmt2;
+              if(wBudget2 > 0 && wAmt2 > 0 && estCost2 > wBudget2){
+                return <div style={{fontSize:12,color:"#A32D2D",background:"#FFF0F0",borderRadius:6,padding:"4px 10px",border:"1px solid #F5BDBD"}}>⚠️ تعبرت البدجت! {selCount} كريتور × {fmt(wAmt2)} = {fmt(estCost2)} (بدجت: {fmt(wBudget2)})</div>;
+              }
+              if(wCount2 > 0 && selCount > wCount2){
+                return <div style={{fontSize:12,color:"#A32D2D",background:"#FFF0F0",borderRadius:6,padding:"4px 10px",border:"1px solid #F5BDBD"}}>⚠️ اخترت {selCount} وانت طلبت {wCount2} كريتور بس!</div>;
+              }
+              return null;
+            })()}
             <button style={S.secondaryBtn} onClick={selectAll}>اختر الكل</button>
             <button style={S.ghostBtn} onClick={() => { setSelectMode(false); clearSel(); }}>إلغاء</button>
           </>
@@ -2474,6 +2492,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           <input type="file" accept=".json" onChange={importToDatabase} style={{ display: "none" }} />
         </label>
         <button style={S.ghostBtn} onClick={printDatabaseList} disabled={list.length === 0}>🖨️ تصدير PDF</button>
+        <button style={S.ghostBtn} onClick={() => setShowManageTypes(true)}>🏷️ أنواع المحتوى</button>
         {msg && <span style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith("\u2713") ? "#0F6E56" : "#A32D2D" }}>{msg}</span>}
       </div>
 
@@ -2492,6 +2511,16 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 {["بغداد", "البصرة", "نينوى", "أربيل", "النجف", "كربلاء", "كركوك", "بابل", "الأنبار", "ذي قار", "ديالى", "السليمانية", "واسط", "صلاح الدين", "القادسية", "ميسان", "المثنى", "دهوك", "حلبجة"].map((p) => <option key={p} value={p} />)}
               </datalist>
               <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label style={{ fontSize: 12, color: "#888780", marginBottom: 4, display: "block" }}>نوع المحتوى</label>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  <select style={S.input} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })}>
+                    <option value="">— اختر —</option>
+                    {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                  <input style={{ ...S.input, flex: 1 }} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })} placeholder="أو اكتب نوع مخصص..." />
+                </div>
+              </div>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button style={S.primaryBtn} onClick={saveCreator}>{editId ? "حفظ التعديل" : "أضف"}</button>
@@ -2564,6 +2593,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 <th style={S.thNum}>آخر سعر</th>
                 <th style={S.th}>المحافظة</th>
                 <th style={S.th}>ملاحظة</th>
+                <th style={S.th}>نوع المحتوى</th>
                 <th style={{ ...S.th, width: 90 }}></th>
               </tr>
             </thead>
@@ -2614,6 +2644,16 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                   <td style={S.tdNum}>{c.lastPrice ? fmt(c.lastPrice) : "—"}</td>
                   <td style={S.tdMuted}>{c.province || "—"}</td>
                   <td style={S.tdMuted}>{c.note || "—"}</td>
+                  <td style={S.tdMuted}>
+                    <select
+                      value={c.contentType||''}
+                      onChange={(e)=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,contentType:e.target.value}:x)}))}
+                      style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 4px',fontSize:12,background:'transparent',maxWidth:120}}
+                    >
+                      <option value="">—</option>
+                      {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </td>
                   <td style={S.td}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                       <button style={S.iconBtn} onClick={() => setHistoryOf(c)} title="سجل الكريتور">📋</button>
@@ -2628,6 +2668,71 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           </table>
         </div>
       )}
+
+      {showCampaignWizard && (() => {
+        const wBudget = Number(campaignWizard.budget) || 0;
+        const wCount = Number(campaignWizard.creatorCount) || 0;
+        const wAmt = Number(campaignWizard.amount) || 0;
+        const estimatedCost = wCount * wAmt;
+        const overBudget = wBudget > 0 && wCount > 0 && wAmt > 0 && estimatedCost > wBudget;
+        return (
+          <div style={S.modalOverlay} onClick={() => setShowCampaignWizard(false)}>
+            <div style={{ ...S.modalCard, maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
+              <div style={S.panelTitle}>🚀 سوي كامبين جديد</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12, marginTop: 8 }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={S.fieldLabel}>اسم الكامبين</label>
+                  <input style={S.input} list="campaign-list-wizard" value={campaignWizard.campaign} onChange={(e) => setCampaignWizard({ ...campaignWizard, campaign: e.target.value })} placeholder="مثال: حملة رمضان 2025" />
+                  <datalist id="campaign-list-wizard">
+                    {[...new Set((data.campaigns || []).map((c) => c.name))].filter(Boolean).map((n, i) => <option key={i} value={n} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>بدجت الكامبين (دولار)</label>
+                  <input style={S.input} type="number" value={campaignWizard.budget} onChange={(e) => setCampaignWizard({ ...campaignWizard, budget: e.target.value })} placeholder="مثال: 2000" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>ديدلاين الكامبين</label>
+                  <input style={S.input} type="date" value={campaignWizard.deadline||''} onChange={(e) => setCampaignWizard({ ...campaignWizard, deadline: e.target.value })} />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>عدد الكريتورز المطلوب</label>
+                  <input style={S.input} type="number" value={campaignWizard.creatorCount} onChange={(e) => setCampaignWizard({ ...campaignWizard, creatorCount: e.target.value })} placeholder="مثال: 10" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>السعر لكل كريتور</label>
+                  <input style={S.input} type="number" value={campaignWizard.amount} onChange={(e) => setCampaignWizard({ ...campaignWizard, amount: e.target.value })} placeholder="0" />
+                </div>
+                <div>
+                  <label style={S.fieldLabel}>نوع المحتوى المطلوب</label>
+                  <select style={S.input} value={campaignWizard.contentType} onChange={(e) => setCampaignWizard({ ...campaignWizard, contentType: e.target.value })}>
+                    <option value="">— اختر —</option>
+                    {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              {overBudget && (
+                <div style={{ background: "#FFF3CD", border: "1px solid #FFCA2C", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#664d03" }}>
+                  ⚠️ تعبرت البدجت! التكلفة المتوقعة <b>{wCount + " × " + fmt(wAmt) + " = " + fmt(estimatedCost)}</b> تتجاوز البدجت <b>{fmt(wBudget)}</b>.
+                </div>
+              )}
+              {wBudget > 0 && wCount > 0 && wAmt > 0 && !overBudget && (
+                <div style={{ background: "#D1FAE5", border: "1px solid #34D399", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#065F46" }}>
+                  ✅ التكلفة المتوقعة <b>{wCount + " × " + fmt(wAmt) + " = " + fmt(estimatedCost)}</b> ضمن البدجت <b>{fmt(wBudget)}</b>.
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button style={S.primaryBtn} disabled={!campaignWizard.campaign.trim()} onClick={() => {
+                  setAssign({ campaign: campaignWizard.campaign.trim(), amount: campaignWizard.amount });
+                  setShowCampaignWizard(false);
+                  setSelectMode(true);
+                }}>اختار الكريتورز ←</button>
+                <button style={S.ghostBtn} onClick={() => setShowCampaignWizard(false)}>إلغاء</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {showAssign && (
         <div style={S.modalOverlay} onClick={() => setShowAssign(false)}>
@@ -2652,6 +2757,58 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             <div style={{ display: "flex", gap: 8 }}>
               <button style={S.primaryBtn} onClick={addSelectedToCampaign}>أضفهم للكامبين</button>
               <button style={S.ghostBtn} onClick={() => setShowAssign(false)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showManageTypes && (
+        <div style={S.modalOverlay} onClick={() => setShowManageTypes(false)}>
+          <div style={{ ...S.modalCard, maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div style={S.panelTitle}>🏷️ أنواع المحتوى</div>
+            <p style={{ fontSize: 13, color: "#888780", margin: "0 0 12px", lineHeight: 1.6 }}>
+              اختر أو أضف أنواع المحتوى اللي تستخدمها مع الكريتورز.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+              {(data.contentTypes && data.contentTypes.length > 0 ? data.contentTypes : DEFAULT_CONTENT_TYPES).map((t) => (
+                <div key={t} style={{ display: "flex", alignItems: "center", gap: 4, background: "#F0F9F8", border: "1px solid #B2DFDB", borderRadius: 20, padding: "4px 10px", fontSize: 13 }}>
+                  <span>{t}</span>
+                  <button
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#A32D2D", fontWeight: 700, fontSize: 14, lineHeight: 1 }}
+                    onClick={() => upd(d => ({ ...d, contentTypes: (d.contentTypes && d.contentTypes.length ? d.contentTypes : DEFAULT_CONTENT_TYPES).filter(x => x !== t) }))}
+                  >×</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+              <input
+                style={{ ...S.input, flex: 1 }}
+                value={newTypeInput}
+                onChange={(e) => setNewTypeInput(e.target.value)}
+                placeholder="أضف نوع محتوى جديد..."
+                onKeyDown={(e) => {
+                  if(e.key === 'Enter' && newTypeInput.trim()){
+                    const cur = data.contentTypes && data.contentTypes.length ? data.contentTypes : [...DEFAULT_CONTENT_TYPES];
+                    if(!cur.includes(newTypeInput.trim())){
+                      upd(d => ({ ...d, contentTypes: [...(d.contentTypes && d.contentTypes.length ? d.contentTypes : DEFAULT_CONTENT_TYPES), newTypeInput.trim()] }));
+                    }
+                    setNewTypeInput("");
+                  }
+                }}
+              />
+              <button style={S.primaryBtn} onClick={() => {
+                if(newTypeInput.trim()){
+                  const cur = data.contentTypes && data.contentTypes.length ? data.contentTypes : [...DEFAULT_CONTENT_TYPES];
+                  if(!cur.includes(newTypeInput.trim())){
+                    upd(d => ({ ...d, contentTypes: [...(d.contentTypes && d.contentTypes.length ? d.contentTypes : DEFAULT_CONTENT_TYPES), newTypeInput.trim()] }));
+                  }
+                  setNewTypeInput("");
+                }
+              }}>+ أضف</button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={S.ghostBtn} onClick={() => setShowManageTypes(false)}>إغلاق</button>
+              <button style={{ ...S.ghostBtn, color: "#A32D2D" }} onClick={() => { upd(d => ({ ...d, contentTypes: [...DEFAULT_CONTENT_TYPES] })); }}>إعادة تعيين</button>
             </div>
           </div>
         </div>
