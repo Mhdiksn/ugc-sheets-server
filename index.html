@@ -119,7 +119,16 @@ html, body { margin: 0; padding: 0; background: #F5F7F7; font-family: 'Archivo',
 [data-theme="dark"] div[style*="border-bottom: 1px solid rgb(232, 230, 222)"] { border-bottom-color: #2E2E2E !important; }
 
 /* Table header specific */
-[data-theme="dark"] div[style*="border-bottom: 1px solid rgb(216, 220, 220)"][style*="background: rgb(255, 255, 255)"] { background: #181818 !important; color: #9A9A9A !important; }</style>
+[data-theme="dark"] div[style*="border-bottom: 1px solid rgb(216, 220, 220)"][style*="background: rgb(255, 255, 255)"] { background: #181818 !important; color: #9A9A9A !important; }
+/* === Fix: span/button elements with inline RGB backgrounds in dark mode === */
+[data-theme="dark"] span[style*="background: rgb(237, 239, 239)"] { background: #1E2424 !important; color: #16A699 !important; border-color: #1A4040 !important; }
+[data-theme="dark"] button[style*="background: rgb(237, 239, 239)"] { background: #1E2424 !important; color: #16A699 !important; border-color: #1A4040 !important; }
+[data-theme="dark"] button[style*="background: rgb(254, 226, 226)"] { background: #2A1010 !important; border-color: #4A2020 !important; }
+[data-theme="dark"] span[style*="background: rgb(254, 226, 226)"] { background: #2A1010 !important; }
+[data-theme="dark"] button[style*="background: rgb(255, 242, 207)"] { background: #2A2010 !important; }
+[data-theme="dark"] button[style*="background: rgb(255, 255, 255)"] { background: #222222 !important; color: #EFEFEF !important; border-color: #2E2E2E !important; }
+[data-theme="dark"] th[style*="background: rgb(245, 248, 248)"] { background: #181818 !important; color: #9A9A9A !important; }
+</style>
 </head>
 <body>
 <div id="root">
