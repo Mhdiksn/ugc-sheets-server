@@ -2187,10 +2187,13 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   const [assign, setAssign] = useState({ campaign: "", amount: "" });
   const [blForm, setBlForm] = useState(null);
   const [showCampaignWizard, setShowCampaignWizard] = useState(false);
-  const [campaignWizard, setCampaignWizard] = useState({ campaign: "", budget: "", creatorCount: "", contentType: "", amount: "", deadline: "" });
+  const [campaignWizard, setCampaignWizard] = useState({ campaign: "", budget: "", creatorCount: "", contentType: "", deadline: "" });
   const [showManageTypes, setShowManageTypes] = useState(false);
   const [newTypeInput, setNewTypeInput] = useState("");
-  const [historyOf, setHistoryOf] = useState(null); // كريتور لعرض سجله
+  const [historyOf, setHistoryOf] = useState(null);
+  const [priceRange, setPriceRange] = useState({ min: "", max: "" });
+  const [provinceFilter, setProvinceFilter] = useState("all");
+  const [nicheFilter, setNicheFilter] = useState("all"); // كريتور لعرض سجله
 
   // شرائح فلتر المتابعين
   const FOLLOWER_TIERS = [
@@ -2389,6 +2392,14 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         if (!isNaN(last) && Date.now() - last.getTime() < TWO_WEEKS) return false;
       }
     }
+        // فلترة حسب السعر
+    const price = Number(c.lastPrice) || 0;
+    if (priceRange.min !== "" && price < Number(priceRange.min)) return false;
+    if (priceRange.max !== "" && price > Number(priceRange.max)) return false;
+    // فلترة حسب المحافظة
+    if (provinceFilter !== "all" && (c.province || "").trim() !== provinceFilter) return false;
+    // فلترة حسب النيش
+    if (nicheFilter !== "all" && !(c.contentTypes || []).includes(nicheFilter)) return false;
     return true;
   });
   // ترتيب
@@ -2481,15 +2492,21 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
             </button>
             {(() => {
               const wBudget2 = Number(campaignWizard.budget) || 0;
-              const wAmt2 = Number(campaignWizard.amount) || 0;
               const wCount2 = Number(campaignWizard.creatorCount) || 0;
-              const estCost2 = selCount * wAmt2;
-              if(wBudget2 > 0 && wAmt2 > 0 && estCost2 > wBudget2){
-                return <div style={{fontSize:12,color:"#A32D2D",background:"#FFF0F0",borderRadius:6,padding:"4px 10px",border:"1px solid #F5BDBD"}}>⚠️ تعبرت البدجت! {selCount} كريتور × {fmt(wAmt2)} = {fmt(estCost2)} (بدجت: {fmt(wBudget2)})</div>;
-              }
-              if(wCount2 > 0 && selCount > wCount2){
-                return <div style={{fontSize:12,color:"#A32D2D",background:"#FFF0F0",borderRadius:6,padding:"4px 10px",border:"1px solid #F5BDBD"}}>⚠️ اخترت {selCount} وانت طلبت {wCount2} كريتور بس!</div>;
-              }
+              const selPrices = db.filter(c => selected.has(c.id)).map(c => Number(c.lastPrice) || 0);
+              const estCost2 = selPrices.reduce((a, b) => a + b, 0);
+              const warnOver = wBudget2 > 0 && selCount > 0 && estCost2 > wBudget2;
+              const warnCount = wCount2 > 0 && selCount > wCount2;
+              if(warnOver) return (
+                <div style={{ padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "#A32D2D", background: "#FFF0F0", borderRadius: 6, border: "1px solid #F5BDBD" }}>
+                  ⚠️ تعبرت البدجت! التكلفة المتوقعة <b>{fmt(estCost2)}</b> تتجاوز البدجت <b>{fmt(wBudget2)}</b>.
+                </div>
+              );
+              if(warnCount) return (
+                <div style={{ padding: "8px 12px", marginBottom: 12, fontSize: 13, color: "#065F46", background: "#F0FFF8", borderRadius: 6, border: "1px solid #6EE7B7" }}>
+                  ✅ اخترت {selCount} كريتور (المطلوب: {wCount2})
+                </div>
+              );
               return null;
             })()}
             <button style={S.secondaryBtn} onClick={selectAll}>اختر الكل</button>
@@ -2588,6 +2605,46 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           <option value="price_desc">الأغلى سعراً</option>
           <option value="name">أبجدي (الاسم)</option>
         </select>
+      </div>
+      {/* فلترة حسب السعر */}
+      <div style={S.dbFilterRow}>
+        <span style={S.campaignFilterLabel}>السعر ($):</span>
+        <input
+          type="number"
+          placeholder="من"
+          value={priceRange.min}
+          onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+          style={{ ...S.input, width: 80, padding: "4px 8px", fontSize: 13 }}
+        />
+        <span style={{ color: "#888", fontSize: 13 }}>—</span>
+        <input
+          type="number"
+          placeholder="إلى"
+          value={priceRange.max}
+          onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+          style={{ ...S.input, width: 80, padding: "4px 8px", fontSize: 13 }}
+        />
+        {(priceRange.min !== "" || priceRange.max !== "") && (
+          <button style={{ ...S.campChip, background: "#eee" }} onClick={() => setPriceRange({ min: "", max: "" })}>✕ مسح</button>
+        )}
+      </div>
+      {/* فلترة حسب المحافظة */}
+      <div style={{ ...S.dbFilterRow, flexWrap: "wrap" }}>
+        <span style={S.campaignFilterLabel}>المحافظة:</span>
+        {["all", "بغداد", "البصرة", "نينوى", "أربيل", "النجف", "كربلاء", "الديوانية", "ميسان", "ذي قار", "واسط", "المثنى", "بابل", "صلاح الدين", "الأنبار", "كركوك", "ديالى", "السليمانية", "دهوك"].map((p) => (
+          <button key={p} onClick={() => setProvinceFilter(p)} style={{ ...S.campChip, ...(provinceFilter === p ? S.campChipActive : {}) }}>
+            {p === "all" ? "الكل" : p}
+          </button>
+        ))}
+      </div>
+      {/* فلترة حسب النيش */}
+      <div style={{ ...S.dbFilterRow, flexWrap: "wrap" }}>
+        <span style={S.campaignFilterLabel}>النيش:</span>
+        {["all", ...contentTypes].map((n) => (
+          <button key={n} onClick={() => setNicheFilter(n)} style={{ ...S.campChip, ...(nicheFilter === n ? S.campChipActive : {}) }}>
+            {n === "all" ? "الكل" : n}
+          </button>
+        ))}
       </div>
       {(followersFilter !== "all" || q) && (
         <p style={{ fontSize: 12.5, color: "#888780", margin: "0 0 12px" }}>
@@ -2705,11 +2762,6 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       )}
 
       {showCampaignWizard && (() => {
-        const wBudget = Number(campaignWizard.budget) || 0;
-        const wCount = Number(campaignWizard.creatorCount) || 0;
-        const wAmt = Number(campaignWizard.amount) || 0;
-        const estimatedCost = wCount * wAmt;
-        const overBudget = wBudget > 0 && wCount > 0 && wAmt > 0 && estimatedCost > wBudget;
         return (
           <div style={S.modalOverlay} onClick={() => setShowCampaignWizard(false)}>
             <div style={{ ...S.modalCard, maxWidth: 500 }} onClick={(e) => e.stopPropagation()}>
@@ -2734,10 +2786,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                   <label style={S.fieldLabel}>عدد الكريتورز المطلوب</label>
                   <input style={S.input} type="number" value={campaignWizard.creatorCount} onChange={(e) => setCampaignWizard({ ...campaignWizard, creatorCount: e.target.value })} placeholder="مثال: 10" />
                 </div>
-                <div>
-                  <label style={S.fieldLabel}>السعر لكل كريتور</label>
-                  <input style={S.input} type="number" value={campaignWizard.amount} onChange={(e) => setCampaignWizard({ ...campaignWizard, amount: e.target.value })} placeholder="0" />
-                </div>
+                
                 <div>
                   <label style={S.fieldLabel}>نوع المحتوى المطلوب</label>
                   <select style={S.input} value={campaignWizard.contentType} onChange={(e) => setCampaignWizard({ ...campaignWizard, contentType: e.target.value })}>
@@ -2745,20 +2794,8 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                     {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-              </div>
-              {overBudget && (
-                <div style={{ background: "#FFF3CD", border: "1px solid #FFCA2C", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#664d03" }}>
-                  ⚠️ تعبرت البدجت! التكلفة المتوقعة <b>{wCount + " × " + fmt(wAmt) + " = " + fmt(estimatedCost)}</b> تتجاوز البدجت <b>{fmt(wBudget)}</b>.
-                </div>
-              )}
-              {wBudget > 0 && wCount > 0 && wAmt > 0 && !overBudget && (
-                <div style={{ background: "#D1FAE5", border: "1px solid #34D399", borderRadius: 8, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#065F46" }}>
-                  ✅ التكلفة المتوقعة <b>{wCount + " × " + fmt(wAmt) + " = " + fmt(estimatedCost)}</b> ضمن البدجت <b>{fmt(wBudget)}</b>.
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                <button style={S.primaryBtn} disabled={!campaignWizard.campaign.trim()} onClick={() => {
-                  setAssign({ campaign: campaignWizard.campaign.trim(), amount: campaignWizard.amount });
+ onClick={() => {
+                  setAssign({ campaign: campaignWizard.campaign.trim(), amount: "" });
                   setShowCampaignWizard(false);
                   setSelectMode(true);
                 }}>اختار الكريتورز ←</button>
