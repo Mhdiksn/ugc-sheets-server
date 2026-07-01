@@ -261,7 +261,7 @@ function App() {
     (async () => {
       const d = await loadAll();
       if (d) setData({ ...EMPTY, ...d });
-      setLoaded(true);
+      setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb.refFromURL(_fbu+'/ugcData').on('value',function(sn){var dv=sn.val();if(dv&&typeof dv==='object')setData(function(){return Object.assign({},EMPTY,dv);});})}}
     })();
   }, []);
 
