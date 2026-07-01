@@ -1,4 +1,4 @@
-_updatedAt<meta charset="UTF-8" />
+<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>UGC Iraq — المالية الداخلية</title>
 <style>
@@ -19,7 +19,7 @@ _updatedAt<meta charset="UTF-8" />
     <div class="spin"></div>
     <div>يحمّل التطبيق...</div>
   </div>
-</div>
+</div>hh
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -171,6 +171,7 @@ async function saveAll(data) {
   const fb = getFirebaseURL();
   if (fb) {
     try {
+     window._lastLocalSave = Date.now();
       const resp = await fetch(`${fb}/ugcData.json?auth=${await getFirebaseToken()}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -258,7 +259,7 @@ function App() {
     (async () => {
       const d = await loadAll();
       if (d) setData({ ...EMPTY, ...d });
-      setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb.refFromURL(_fbu+'/ugcData').on('value',function(sn){var dv=sn.val();if(dv&&typeof dv==='object')setData(function(){return Object.assign({},EMPTY,dv);});})}}
+            setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb.refFromURL(_fbu+'/ugcData').on('value',function(sn){var dv=sn.val();if(dv&&typeof dv==='object'&&(dv._updatedAt||0)>(window._lastLocalSave||0)+2000)setData(function(){return Object.assign({},EMPTY,dv);})})}}
     })();
   }, []);
 
@@ -4302,7 +4303,8 @@ function SettingsTab({ data, setData, upd, staffList }) {
 
         // وضع الاستبدال الكامل (القديم)
         if (importMode === "replace") {
-          setData({ ...EMPTY, ...parsed });
+          window._lastLocalSave = Date.now();
+ setData({ ...EMPTY, ...parsed });
           setCap(parsed.capital || 0);
           setSrv(parsed.serverUrl || "");
           setMsg("✓ تم استبدال كل البيانات بالملف");
