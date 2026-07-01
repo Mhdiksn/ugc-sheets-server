@@ -1657,7 +1657,7 @@ function CreatorsTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                         "—"
                       )}
                     </td>
-                    <td style={S.tdKey}>{c.superKey || "—"}</td>
+                    <td style={{...S.tdKey,padding:'2px 4px'}}><input style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 6px',width:90,fontSize:12,background:'transparent'}} value={c.superKey||''} onChange={(e)=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,superKey:e.target.value}:x)}))} placeholder="—" /></td>
                     <td style={S.tdMuted}>{c.campaign || "—"}</td>
                     <td style={S.tdNum}>{fmt(c.amount)}</td>
                     <td style={S.tdNum}>{fmt(c.paid)}</td>
