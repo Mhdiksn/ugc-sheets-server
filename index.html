@@ -124,7 +124,7 @@ const FB_URL_KEY = "ugc_firebase_url"; // رابط قاعدة Firebase (محفو
 
 // رابط Firebase الحالي (من التخزين المحلي)
 function getFirebaseURL() {
-  try { return (localStorage.getItem(FB_URL_KEY) || "").trim().replace(/\/+$/, ""); } catch (e) { return ""; }
+  try { return (localStorage.getItem(FB_URL_KEY) || "https://ugc-iraq-default-rtdb.firebaseio.com").trim().replace(/\/+$/, ""); } catch(e) {return "https://ugc-iraq-default-rtdb.firebaseio.com"}
 }
 function setFirebaseURL(url) {
   try {
@@ -702,7 +702,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
             <TrashTab data={data} restoreFromTrash={restoreFromTrash} purgeFromTrash={purgeFromTrash} emptyTrash={emptyTrash} />
           )}
           {tab === "settings" && isFullAdmin && (
-            <SettingsTab data={data} setData={setData} upd={upd} staffList={staffList} />
+            <SettingsTab data={data} setData={setData} upd={upd} staffList={staffList} isStaff={isStaff} />
           )}
         </main>
 
@@ -4236,7 +4236,7 @@ function StaffManager({ data, upd, staffList }) {
 // ============================================================================
 // تبويب الإعدادات
 // ============================================================================
-function SettingsTab({ data, setData, upd, staffList }) {
+function SettingsTab({ data, setData, upd, staffList, isStaff }) {
   const [cap, setCap] = useState(data.capital || 0);
   const [srv, setSrv] = useState(data.serverUrl || "");
   const [srvTest, setSrvTest] = useState(""); // نتيجة فحص الخادم
@@ -4405,7 +4405,7 @@ function SettingsTab({ data, setData, upd, staffList }) {
     <div>
       <SectionTitle>الإعدادات والبيانات</SectionTitle>
 
-      <FirebasePanel data={data} setData={setData} />
+      {!isStaff && <FirebasePanel data={data} setData={setData} />}
 
       <StaffManager data={data} upd={upd} staffList={staffList} />
 
