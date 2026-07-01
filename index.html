@@ -2640,7 +2640,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
       {/* فلترة حسب النيش */}
       <div style={{ ...S.dbFilterRow, flexWrap: "wrap" }}>
         <span style={S.campaignFilterLabel}>النيش:</span>
-        {["all", ...contentTypes].map((n) => (
+        {["all", ...(data.contentTypes && data.contentTypes.length ? data.contentTypes : DEFAULT_CONTENT_TYPES)].map((n) => (
           <button key={n} onClick={() => setNicheFilter(n)} style={{ ...S.campChip, ...(nicheFilter === n ? S.campChipActive : {}) }}>
             {n === "all" ? "الكل" : n}
           </button>
@@ -2794,7 +2794,9 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                     {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
- onClick={() => {
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+                <button style={S.primaryBtn} disabled={!campaignWizard.campaign.trim()} onClick={() => {
                   setAssign({ campaign: campaignWizard.campaign.trim(), amount: "" });
                   setShowCampaignWizard(false);
                   setSelectMode(true);
