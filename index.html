@@ -1,7 +1,4 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8" />
+_updatedAt<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>UGC Iraq — المالية الداخلية</title>
 <style>
@@ -34,7 +31,7 @@
   const _fbAuth=firebase.auth();
  _fbAuth.signInAnonymously().catch(function(e){console.error("Firebase auth error:",e);});
  window.getFirebaseToken=function(){return new Promise(function(rs){var u=_fbAuth.currentUser;if(u)u.getIdToken().then(rs).catch(function(){rs("");});else{var x=_fbAuth.onAuthStateChanged(function(v){x();if(v)v.getIdToken().then(rs).catch(function(){rs("");});else rs("");});}});};
- window.initFbDb=function(){try{window._fbDb=firebase.database();}catch(e){}};window.initFbDb();
+ window.initFbDb=function(){try{window._fbDb=firebase.database();}catch(e){}};window.initFbDb();(function(){var of=window.fetch;window.fetch=function(u,o){var s=String(u);if(s.includes('firebaseio.com')&&!s.includes('auth=')){var p=window.getFirebaseToken?window.getFirebaseToken():Promise.resolve('');return p.then(function(t){return of(t?s+(s.includes('?')?'&':'?')+'auth='+t:s,o);});}return of.apply(this,arguments);};})();
 </script>
  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
