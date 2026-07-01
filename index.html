@@ -28,12 +28,13 @@
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
  if(!firebase.apps.length){firebase.initializeApp({apiKey:"AIzaSyDhAARa2PPP_gSTm5D-z3UnntRXgGwhhVw",authDomain:"ugc-iraq.firebaseapp.com",databaseURL:"https://ugc-iraq-default-rtdb.firebaseio.com",projectId:"ugc-iraq",storageBucket:"ugc-iraq.firebasestorage.app",messagingSenderId:"27994174062",appId:"1:27994174062:web:92ded0da6a367f774d6c7f"});}
   const _fbAuth=firebase.auth();
  _fbAuth.signInAnonymously().catch(function(e){console.error("Firebase auth error:",e);});
  window.getFirebaseToken=function(){return new Promise(function(rs){var u=_fbAuth.currentUser;if(u)u.getIdToken().then(rs).catch(function(){rs("");});else{var x=_fbAuth.onAuthStateChanged(function(v){x();if(v)v.getIdToken().then(rs).catch(function(){rs("");});else rs("");});}});};
- window.getFirebaseToken=function(){return _fbAuth.currentUser?_fbAuth.currentUser.getIdToken():Promise.resolve("");};
+ window.initFbDb=function(){try{window._fbDb=firebase.database();}catch(e){}};window.initFbDb();
 </script>
  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
