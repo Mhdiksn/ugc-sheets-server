@@ -2519,7 +2519,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
                   <select style={S.input} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })}>
                     <option value="">— اختر —</option>
-                    {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                    {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                   <input style={{ ...S.input, flex: 1 }} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })} placeholder="أو اكتب نوع مخصص..." />
                 </div>
@@ -2654,7 +2654,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                       style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 4px',fontSize:12,background:'transparent',maxWidth:120}}
                     >
                       <option value="">—</option>
-                      {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                      {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
                     </select>
                   </td>
                   <td style={S.td}>
@@ -2710,7 +2710,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                   <label style={S.fieldLabel}>نوع المحتوى المطلوب</label>
                   <select style={S.input} value={campaignWizard.contentType} onChange={(e) => setCampaignWizard({ ...campaignWizard, contentType: e.target.value })}>
                     <option value="">— اختر —</option>
-                    {(data.contentTypes||DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
+                    {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
