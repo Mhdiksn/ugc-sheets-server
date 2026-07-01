@@ -10,6 +10,44 @@
   #boot .spin { width: 28px; height: 28px; border: 3px solid #EDEFEF; border-top-color: #16A699; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
   #boot .err { color: #D32F2F; font-size: 14px; max-width: 400px; line-height: 1.6; }
   @keyframes bootspin { to { transform: rotate(360deg); } }
+  /* === UGC Dark Mode === */
+  :root {
+    --ugc-bg: #FFFFFF;
+    --ugc-bg2: #EDEFEF;
+    --ugc-bg3: #F8F9FA;
+    --ugc-text: #1A1A1A;
+    --ugc-text2: #6B7676;
+    --ugc-border: #D8DCDC;
+    --ugc-card: #FFFFFF;
+    --ugc-card2: #F5F5F5;
+  }
+  [data-theme="dark"] {
+    --ugc-bg: #1A1A1A;
+    --ugc-bg2: #242424;
+    --ugc-bg3: #1E1E1E;
+    --ugc-text: #FFFFFF;
+    --ugc-text2: #A0A0A0;
+    --ugc-border: #333333;
+    --ugc-card: #242424;
+    --ugc-card2: #2A2A2A;
+  }
+  [data-theme="dark"] body,
+  [data-theme="dark"] html { background: #1A1A1A !important; color: #FFFFFF !important; }
+  [data-theme="dark"] #boot { background: #1A1A1A !important; }
+  [data-theme="dark"] #boot .spin { border-color: #333; border-top-color: #16A699; }
+  [data-theme="dark"] div[style*="background: \"#FFFFFF\""],
+  [data-theme="dark"] div[style*='background: "#FFFFFF"'] { background: #242424 !important; }
+  [data-theme="dark"] div[style*="color: \"#1A1A1A\""],
+  [data-theme="dark"] div[style*='color: "#1A1A1A"'] { color: #FFFFFF !important; }
+  [data-theme="dark"] div[style*="background: \"#EDEFEF\""],
+  [data-theme="dark"] div[style*='background: "#EDEFEF"'] { background: #2A2A2A !important; }
+  [data-theme="dark"] div[style*="background: \"#F8F9FA\""],
+  [data-theme="dark"] div[style*='background: "#F8F9FA"'] { background: #1E1E1E !important; }
+  [data-theme="dark"] td, [data-theme="dark"] th { border-color: #333 !important; color: #FFFFFF !important; }
+  [data-theme="dark"] table { background: #242424 !important; }
+  [data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea {
+    background: #2A2A2A !important; color: #FFFFFF !important; border-color: #444 !important;
+  }
 </style>
 </head>
 <body>
@@ -249,6 +287,7 @@ function App() {
   const [authed, setAuthed] = useState(false);
   const [pinInput, setPinInput] = useState("");
   const [pinErr, setPinErr] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('ugc_theme') === 'dark');
   const [currentUser, setCurrentUser] = useState(null); // null=الأدمن الرئيسي، أو كائن الموظف
 
   const [data, setData] = useState(EMPTY);
@@ -263,6 +302,11 @@ function App() {
   const [syncMsg, setSyncMsg] = useState(""); // رسالة مزامنة Firebase
 
   // تحميل أولي
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+    localStorage.setItem('ugc_theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
+
   useEffect(() => {
     (async () => {
       const d = await loadAll();
@@ -590,11 +634,17 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
     };
     return (
       <Shell>
-        <div style={S.lockWrap}>
-          <div style={S.lockCard}>
-            <div style={S.lockIcon}>🔒</div>
-            <h1 style={S.lockTitle}>UGC Iraq</h1>
-            <p style={S.lockSub}>أدخل رمز الدخول الخاص بك للمتابعة.</p>
+        <div style={{...S.lockWrap, background: darkMode ? "#1A1A1A" : "#FFFFFF"}}>
+          <div style={{...S.lockCard, background: darkMode ? "#242424" : "#FFFFFF", border: darkMode ? "1px solid #333333" : "1px solid #D8DCDC", position: "relative"}}>
+            <div style={S.lockIcon}><svg width="72" height="44" viewBox="0 0 160 96" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto"><g fill="#16A699"><rect x="4" y="4" width="14" height="44" rx="4"/><rect x="4" y="44" width="38" height="14" rx="7"/><rect x="30" y="4" width="14" height="44" rx="4"/><rect x="60" y="4" width="14" height="14"/><rect x="60" y="4" width="14" height="58" rx="4"/><rect x="60" y="48" width="40" height="14" rx="4"/><rect x="86" y="4" width="14" height="26" rx="4"/><rect x="86" y="48" width="14" height="14"/><rect x="60" y="4" width="40" height="14" rx="4"/><path d="M116 4 Q116 0 120 0 Q160 0 160 48 Q160 96 120 96 Q116 96 116 92 L116 78 Q116 82 120 82 Q144 82 144 48 Q144 14 120 14 Q116 14 116 18 Z"/></g></svg></div>
+            <h1 style={{...S.lockTitle, color: darkMode ? "#16A699" : "#16A699"}}>UGC Iraq</h1>
+            <button onClick={() => setDarkMode(d => !d)} title="Toggle theme" style={{
+              position: 'absolute', top: 16, right: 16,
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 20, color: '#6B7676', padding: '6px', borderRadius: 8,
+              lineHeight: 1
+            }}>{darkMode ? '☀️' : '🌙'}</button>
+            <p style={{...S.lockSub, color: darkMode ? "#A0A0A0" : "#6B7676"}}>WHERE BRANDS ARE MADE.</p>
             <input
               type="password"
               value={pinInput}
@@ -604,12 +654,12 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
               }}
               onKeyDown={(e) => { if (e.key === "Enter") tryLogin(); }}
               placeholder="ACCESS CODE"
-              style={{ ...S.lockInput, borderColor: pinErr ? "#EF4444" : "#D8DCDC" }}
+              style={{ ...S.lockInput, borderColor: pinErr ? "#EF4444" : (darkMode ? "#444444" : "#D8DCDC"), background: darkMode ? "#2A2A2A" : "#FFFFFF", color: darkMode ? "#FFFFFF" : "#1A1A1A" }}
               autoFocus
             />
-            {pinErr && <div style={S.lockErr}>رمز الدخول غلط</div>}
-            <button style={S.lockBtn} onClick={tryLogin}>
-              دخول
+            {pinErr && <div style={S.lockErr}>INVALID CODE — TRY AGAIN.</div>}
+            <button style={{...S.lockBtn}} onClick={tryLogin}>
+              ENTER
             </button>
           </div>
         </div>
@@ -667,7 +717,12 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
           <div style={S.headerRight}>
             {syncMsg && <span style={{ fontSize: 12, color: "#16A699", fontWeight: 700 }}>{syncMsg}</span>}
             <SaveBadge state={saveState} />
-            <button style={S.logoutBtn} onClick={() => { setAuthed(false); setCurrentUser(null); setPinInput(""); }}>
+            <button onClick={() => setDarkMode(d => !d)} title="Toggle theme" style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 18, color: '#6B7676', padding: '6px 10px', borderRadius: 8,
+                marginRight: 4, lineHeight: 1
+              }}>{darkMode ? '☀️' : '🌙'}</button>
+              <button style={S.logoutBtn} onClick={() => { setAuthed(false); setCurrentUser(null); setPinInput(""); }}>
               قفل
             </button>
           </div>
@@ -5283,10 +5338,10 @@ const S = {
 
   // lock
   lockWrap: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "#FFFFFF" },
-  lockCard: { background: "#FFFFFF", border: "1px solid #D8DCDC", borderRadius: 12, padding: "48px 40px", textAlign: "center", maxWidth: 380, width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" },
-  lockIcon: { fontSize: 36, marginBottom: 16, color: "#16A699" },
-  lockTitle: { fontSize: 21, fontWeight: 800, color: "#16A699", margin: "0 0 8px" },
-  lockSub: { fontSize: 13.5, color: "#6B7676", margin: "0 0 28px", lineHeight: 1.6, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
+  lockCard: { background: "#FFFFFF", border: "1px solid #D8DCDC", borderRadius: 12, padding: "48px 40px", textAlign: "center", maxWidth: 380, position: "relative", width: "100%", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" },
+  lockIcon: { marginBottom: 20, display: "flex", justifyContent: "center", alignItems: "center" },
+  lockTitle: { fontSize: 20, fontWeight: 900, color: "#16A699", margin: "12px 0 6px", letterSpacing: 1, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", textTransform: "uppercase" },
+  lockSub: { fontSize: 11, color: "#6B7676", margin: "0 0 28px", lineHeight: 1.4, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
   lockInput: { width: "100%", padding: "14px", border: "2px solid #D8DCDC", borderRadius: 8, fontSize: 20, textAlign: "center", letterSpacing: 8, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", boxSizing: "border-box", marginBottom: 14, outline: "none", transition: "border-color 0.2s" },
   lockErr: { color: "#EF4444", fontSize: 13, marginBottom: 12, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
   lockBtn: { width: "100%", background: "#16A699", color: "#FFFFFF", border: "none", borderRadius: 8, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
