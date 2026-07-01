@@ -196,7 +196,13 @@ async function fetchRemoteUpdatedAt() {
   return null;
 }
 
-const DEFAULT_CONTENT_TYPES = ["ريلز", "ستوري", "تيك توك", "يوتيوب شورت", "بوست ثابت", "لايف", "فيديو يوتيوب", "بودكاست"];
+const DEFAULT_CONTENT_TYPES = [
+  "محتوى رياضي", "محتوى ترفيهي", "محتوى لايف ستايل",
+  "محتوى طبخ", "محتوى بيوتي", "محتوى موضة",
+  "محتوى تقني", "محتوى سفر", "محتوى تعليمي",
+  "محتوى صحي", "محتوى كوميدي", "محتوى فني",
+  "محتوى ديني", "محتوى أعمال", "محتوى عام",
+];
 // ---- بيانات افتراضية فارغة -------------------------------------------------
 const EMPTY = {
   creators: [], // {id, name, handle, phone, superKey, campaign, amount, paid, payStatus, pubStatus, pubLink, date, note}
@@ -2173,7 +2179,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   const [specialFilter, setSpecialFilter] = useState("all"); // all | favorites | available
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", contentType: "" });
+  const [form, setForm] = useState({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", contentTypes: [] });;
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState({});
   const [showAssign, setShowAssign] = useState(false);
@@ -2196,7 +2202,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
     { id: "500+", label: "أكثر من 500K", min: 500000, max: Infinity },
   ];
 
-  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", contentType: "" });
+  const resetForm = () => setForm({ name: "", handle: "", phone: "", followers: "", lastPrice: "", province: "", note: "", superKey: "", contentTypes: [] });
 
   const saveCreator = () => {
     if (!form.name.trim() && !form.handle.trim()) {
@@ -2215,8 +2221,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
           c.lastPrice = Number(form.lastPrice) || 0;
           c.province = (form.province || "").trim();
           c.note = form.note.trim();
-          c.contentType = form.contentType || "";
-        }
+          c.contentTypes = form.contentTypes || [];       }
         return d;
       });
       setEditId(null);
@@ -2230,7 +2235,8 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
         lastPrice: Number(form.lastPrice) || 0,
         province: (form.province || "").trim(),
         note: form.note.trim(),
-        contentType: form.contentType || "",
+        superKey: (form.superKey || "").trim(),
+        contentTypes: form.contentTypes || [],
       };
       upd((d) => {
         d.creatorsDB = [item, ...(d.creatorsDB || [])];
@@ -2242,7 +2248,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
   };
 
   const startEdit = (c) => {
-    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", province: c.province || "", note: c.note || "", contentType: c.contentType || "" });
+    setForm({ name: c.name || "", handle: c.handle || "", phone: c.phone || "", followers: c.followers || "", lastPrice: c.lastPrice || "", province: c.province || "", note: c.note || "", superKey: c.superKey || "", contentTypes: c.contentTypes || [] });
     setEditId(c.id);
     setAdding(true);
   };
@@ -2507,6 +2513,7 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               <input style={S.input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="الاسم" />
               <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.handle} onChange={(e) => setForm({ ...form, handle: e.target.value })} placeholder="رابط الحساب أو @username" />
               <input style={{ ...S.input, direction: "ltr", textAlign: "left" }} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="رقم الموبايل (واتساب)" />
+              <input style={S.input} value={form.superKey||""} onChange={(e) => setForm({ ...form, superKey: e.target.value })} placeholder="رقم السوبر كي / الباي" />
               <input style={S.input} type="number" value={form.followers} onChange={(e) => setForm({ ...form, followers: e.target.value })} placeholder="عدد المتابعين" />
               <input style={S.input} type="number" value={form.lastPrice} onChange={(e) => setForm({ ...form, lastPrice: e.target.value })} placeholder="آخر سعر (اختياري)" />
               <input style={S.input} value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} placeholder="المحافظة (اختياري)" list="iq-provinces" />
@@ -2515,13 +2522,22 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
               </datalist>
               <input style={{ ...S.input, gridColumn: "1 / -1" }} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="ملاحظة (اختياري)" />
               <div style={{ gridColumn: "1 / -1" }}>
-                <label style={{ fontSize: 12, color: "#888780", marginBottom: 4, display: "block" }}>نوع المحتوى</label>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  <select style={S.input} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })}>
-                    <option value="">— اختر —</option>
-                    {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <input style={{ ...S.input, flex: 1 }} value={form.contentType} onChange={(e) => setForm({ ...form, contentType: e.target.value })} placeholder="أو اكتب نوع مخصص..." />
+                <label style={{ fontSize: 12, color: "#888780", marginBottom: 6, display: "block" }}>التخصص / نيش المحتوى (اختر أكثر من واحد)</label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: 10, border: "1px solid #D3D1C7", borderRadius: 9, background: "#FAFAF8", minHeight: 42 }}>
+                  {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t => {
+                    const selected = (form.contentTypes||[]).includes(t);
+                    return (
+                      <button key={t} type="button"
+                        style={{ fontSize: 12, padding: "4px 12px", borderRadius: 20, cursor: "pointer", border: selected ? "1px solid #0F9E8E" : "1px solid #D3D1C7", background: selected ? "#0F9E8E" : "#fff", color: selected ? "#fff" : "#555", fontWeight: selected ? 700 : 400, fontFamily: "inherit" }}
+                        onClick={() => {
+                          const cur = form.contentTypes || [];
+                          const next = cur.includes(t) ? cur.filter(x=>x!==t) : [...cur, t];
+                          setForm({...form, contentTypes: next});
+                        }}>
+                        {selected ? "✓ " : ""}{t}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -2592,11 +2608,12 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                 <th style={S.th}>الاسم</th>
                 <th style={S.th}>رابط الحساب</th>
                 <th style={S.th}>الموبايل</th>
+                <th style={S.th}>سوبر كي</th>
                 <th style={S.thNum}>المتابعين</th>
                 <th style={S.thNum}>آخر سعر</th>
                 <th style={S.th}>المحافظة</th>
                 <th style={S.th}>ملاحظة</th>
-                <th style={S.th}>نوع المحتوى</th>
+                <th style={S.th}>التخصص / النيش</th>
                 <th style={{ ...S.th, width: 90 }}></th>
               </tr>
             </thead>
@@ -2643,19 +2660,34 @@ function DatabaseTab({ data, upd, softDelete, creatorStats, isBlacklisted, addTo
                       "—"
                     )}
                   </td>
+                  <td style={S.tdMuted}>
+                    <input
+                      style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 6px',width:88,fontSize:12,background:'transparent'}}
+                      value={c.superKey||''}
+                      onChange={(e)=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,superKey:e.target.value}:x)}))}
+                      placeholder="—"
+                    />
+                  </td>
                   <td style={S.tdNum}>{c.followers ? fmtFollowers(c.followers) : "—"}</td>
                   <td style={S.tdNum}>{c.lastPrice ? fmt(c.lastPrice) : "—"}</td>
                   <td style={S.tdMuted}>{c.province || "—"}</td>
                   <td style={S.tdMuted}>{c.note || "—"}</td>
                   <td style={S.tdMuted}>
-                    <select
-                      value={c.contentType||''}
-                      onChange={(e)=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,contentType:e.target.value}:x)}))}
-                      style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 4px',fontSize:12,background:'transparent',maxWidth:120}}
-                    >
-                      <option value="">—</option>
-                      {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).map(t=><option key={t} value={t}>{t}</option>)}
-                    </select>
+                    <div style={{display:'flex',flexWrap:'wrap',gap:3,alignItems:'center'}}>
+                      {(c.contentTypes&&c.contentTypes.length?c.contentTypes:[]).map((nt,ni)=>(
+                        <span key={ni} style={{fontSize:11,background:'#E1F5F2',border:'1px solid #B2DFDB',borderRadius:12,padding:'2px 7px',display:'flex',alignItems:'center',gap:3}}>
+                          {nt}
+                          <button style={{background:'none',border:'none',cursor:'pointer',color:'#A32D2D',fontWeight:700,fontSize:11,lineHeight:1,padding:'0 1px'}}
+                            onClick={()=>upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,contentTypes:(x.contentTypes||[]).filter((_,ii)=>ii!==ni)}:x)}))}>×</button>
+                        </span>
+                      ))}
+                      <select style={{border:'1px solid #ddd',borderRadius:4,padding:'2px 4px',fontSize:11,background:'transparent',maxWidth:100}}
+                        value=""
+                        onChange={(e)=>{const v=e.target.value;if(v&&!(c.contentTypes||[]).includes(v))upd(d=>({...d,creatorsDB:d.creatorsDB.map(x=>x.id===c.id?{...x,contentTypes:[...(x.contentTypes||[]),v]}:x)}));e.target.value="";}}>
+                        <option value="">➕ أضف</option>
+                        {(data.contentTypes&&data.contentTypes.length?data.contentTypes:DEFAULT_CONTENT_TYPES).filter(t=>!(c.contentTypes||[]).includes(t)).map(t=><option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
                   </td>
                   <td style={S.td}>
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
