@@ -462,6 +462,15 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
   useEffect(() => {
     if (!loaded) return;
   if(Date.now()-(window._fbLastApply||0)<3000)return;
+    // حماية: لا تحفظ state فاضي على Firebase عند التحميل الأول (race condition fix)
+    const _hasAnyRealData = (data.creatorsDB||[]).length > 0 ||
+      (data.creators||[]).length > 0 ||
+      (data.campaigns||[]).length > 0 ||
+      (data.blacklist||[]).length > 0 ||
+      (data.expenses||[]).length > 0 ||
+      data.capital > 0;
+    if (!_hasAnyRealData && !window._ugcHadRealDataThisSession) return;
+    if (_hasAnyRealData) window._ugcHadRealDataThisSession = true;
     setSaveState("saving");
     const t = setTimeout(async () => {
       lastSaveAt.current = Date.now();
