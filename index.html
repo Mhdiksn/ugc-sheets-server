@@ -1,11 +1,20 @@
-<meta charset="UTF-8" /><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;800;900&display=swap" rel="stylesheet">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ugc system</title>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>UGC Iraq — نظام الإدارة</title>
+<meta name="theme-color" content="#16A699" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F0F0F" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%2316A699'/%3E%3Ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-size='22' font-weight='800' fill='%23fff' text-anchor='middle'%3EUGC%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #F5F7F7; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; }
+html, body { margin: 0; padding: 0; background: #F5F7F7; font-family: 'Archivo', 'IBM Plex Sans Arabic', 'Helvetica Neue', Arial, sans-serif; }
 #root { min-height: 100vh; }
-#boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Archivo', 'Helvetica Neue', Arial, sans-serif; color: #16A699; flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
+#boot { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: 'Archivo', 'IBM Plex Sans Arabic', 'Helvetica Neue', Arial, sans-serif; color: #16A699; flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
 #boot .mark { width: 56px; height: 56px; border-radius: 14px; background: #16A699; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
 #boot .spin { width: 28px; height: 28px; border: 3px solid #EDEFEF; border-top-color: #16A699; border-radius: 50%; animation: bootspin 0.8s linear infinite; }
 #boot .err { color: #D32F2F; font-size: 14px; max-width: 400px; line-height: 1.6; }
@@ -128,6 +137,58 @@ html, body { margin: 0; padding: 0; background: #F5F7F7; font-family: 'Archivo',
 [data-theme="dark"] button[style*="background: rgb(255, 242, 207)"] { background: #2A2010 !important; }
 [data-theme="dark"] button[style*="background: rgb(255, 255, 255)"] { background: #222222 !important; color: #EFEFEF !important; border-color: #2E2E2E !important; }
 [data-theme="dark"] th[style*="background: rgb(245, 248, 248)"] { background: #181818 !important; color: #9A9A9A !important; }
+
+/* ================= UI POLISH 2026 — تحديث الواجهة ================= */
+html { -webkit-tap-highlight-color: transparent; }
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+::selection { background: rgba(22,166,153,.22); }
+
+/* سكرول بار أنعم */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: #C7D0D0; border-radius: 99px; border: 2.5px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: #A9B6B6; }
+[data-theme="dark"] *::-webkit-scrollbar-thumb { background-color: #3A3A3A; }
+[data-theme="dark"] *::-webkit-scrollbar-thumb:hover { background-color: #4C4C4C; }
+nav { scrollbar-width: none; }
+nav::-webkit-scrollbar { display: none; }
+
+/* تفاعل الأزرار: hover / ضغط / تعطيل / تركيز */
+button { transition: filter .15s ease, transform .06s ease, box-shadow .15s ease, background .15s ease, color .15s ease; }
+button:not(:disabled):hover { filter: brightness(.96); }
+[data-theme="dark"] button:not(:disabled):hover { filter: brightness(1.18); }
+button:not(:disabled):active { transform: translateY(1px); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible, a:focus-visible { outline: 2px solid #16A699; outline-offset: 2px; }
+
+/* حلقة تركيز موحّدة للحقول + إطار الحاويات (بحث/شات) */
+input:not([type="checkbox"]):focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(22,166,153,.18); }
+div[style*="border: 1px solid rgb(216, 220, 220)"]:focus-within { border-color: #16A699 !important; box-shadow: 0 0 0 3px rgba(22,166,153,.14); }
+
+/* تمييز صف الجدول عند المرور (الوضع الفاتح — الداكن مغطّى فوق) */
+tbody tr { transition: background .12s ease; }
+tbody tr:hover { background: #F2FAF9; }
+
+/* التبويبات: hover واضح وزوايا علوية */
+nav > button { border-radius: 10px 10px 0 0; transition: color .15s ease, background .15s ease; }
+nav > button:hover { color: #16A699 !important; background: rgba(22,166,153,.07); }
+
+/* حركات دخول خفيفة + سبنر عام */
+@keyframes ugcfade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ugcpop { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+.ugc-spin { width: 26px; height: 26px; border: 3px solid #E4E9E9; border-top-color: #16A699; border-radius: 50%; animation: bootspin .8s linear infinite; }
+[data-theme="dark"] .ugc-spin { border-color: #2E2E2E; border-top-color: #16A699; }
+
+/* موبايل: هوامش أضيق وتبويبات أصغر */
+@media (max-width: 640px) {
+  div[style*="max-width: 1340px"] { padding: 0 12px 56px !important; }
+  nav > button { padding: 11px 10px !important; font-size: 13px !important; }
+}
+
+/* احترام تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 </style>
 </head>
 <body>
@@ -137,7 +198,7 @@ html, body { margin: 0; padding: 0; background: #F5F7F7; font-family: 'Archivo',
     <div class="spin"></div>
     <div>يحمّل التطبيق...</div>
   </div>
-</div>hhh
+</div>
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -715,7 +776,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
     };
     return (
       <Shell>
-        <div style={{...S.lockWrap, background: darkMode ? "#1A1A1A" : "#FFFFFF"}}>
+        <div style={{...S.lockWrap, background: darkMode ? "#0F0F0F" : "radial-gradient(1100px 520px at 50% -10%, #DCF2EF 0%, #F5F7F7 62%)"}}>
           <div style={{...S.lockCard, background: darkMode ? "#242424" : "#FFFFFF", border: darkMode ? "1px solid #333333" : "1px solid #D8DCDC", position: "relative"}}>
             <div style={S.lockIcon}>
               <svg width="90" height="50" viewBox="0 0 320 150" fill="#16A699" xmlns="http://www.w3.org/2000/svg">
@@ -767,7 +828,8 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
   if (!loaded) {
     return (
       <Shell>
-        <div style={{ ...S.lockWrap }}>
+        <div style={{ ...S.lockWrap, background: "var(--ugc-bg)", flexDirection: "column", gap: 14 }}>
+          <div className="ugc-spin" />
           <div style={{ color: "#6B7676", fontSize: 15 }}>...يحمّل البيانات</div>
         </div>
       </Shell>
@@ -812,7 +874,7 @@ setLoaded(true);if(window._fbDb){var _fbu=getFirebaseURL();if(_fbu){window._fbDb
               </svg>
               <div>
                 <div style={{...S.brandName, fontSize:16, fontWeight:800, letterSpacing:"-0.02em"}}>UGC IRAQ</div>
-                <div style={{...S.brandSub, fontSize:11}}>{currentUser ? String.fromCharCode(64)+currentUser.name : "\u00AEuGC"}</div>
+                <div style={{...S.brandSub, fontSize: currentUser ? 11 : 9.5, fontWeight: 700, letterSpacing: currentUser ? "0" : "0.14em"}}>{currentUser ? String.fromCharCode(64)+currentUser.name : "WHERE BRANDS ARE MADE."}</div>
               </div>
             </div>
           </div>
@@ -5055,14 +5117,14 @@ function Modal({ title, children, onClose, wide }) {
 // ============================================================================
 // الأنماط
 // ============================================================================
-const FONT = "'Archivo', 'Tahoma', system-ui, -apple-system, sans-serif";
+const FONT = "'Archivo', 'IBM Plex Sans Arabic', 'Tahoma', system-ui, -apple-system, sans-serif";
 
 const S = {
   shell: {
     fontFamily: FONT,
-    background: "#F5F7F7",
+    background: "var(--ugc-bg)",
     minHeight: "100vh",
-    color: "#1A1A1A",
+    color: "var(--ugc-text)",
     direction: "rtl",
   },
   app: { maxWidth: 1340, margin: "0 auto", padding: "0 24px 60px" },
@@ -5115,9 +5177,14 @@ const S = {
   tabBar: {
     display: "flex",
     gap: 4,
-    borderBottom: "1px solid #DDE1E1",
+    borderBottom: "1px solid var(--ugc-border)",
     marginBottom: 24,
     overflowX: "auto",
+    position: "sticky",
+    top: 0,
+    zIndex: 35,
+    background: "var(--ugc-bg)",
+    paddingTop: 2,
   },
   tab: {
     display: "flex",
@@ -5162,9 +5229,9 @@ const S = {
     padding: "20px 22px",
     boxShadow: "0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.04)",
   },
-  statCardBig: { gridColumn: "span 1", borderColor: "#D8DCDC", background: "#EDEFEF" },
-  statLabel: { fontSize: 13, color: "#6B7676", marginBottom: 8 },
-  statValue: { fontWeight: 800, fontVariantNumeric: "tabular-nums", lineHeight: 1.1 },
+  statCardBig: { gridColumn: "span 1", border: "1px solid #BFE6DE", background: "var(--ugc-teal-light)" },
+  statLabel: { fontSize: 13, color: "#6B7676", marginBottom: 8, fontWeight: 600 },
+  statValue: { fontWeight: 800, fontVariantNumeric: "tabular-nums", lineHeight: 1.1, letterSpacing: "-0.02em" },
   statHint: { fontSize: 12, color: "#A8A69C", marginTop: 7, lineHeight: 1.5 },
 
   twoCol: {
@@ -5329,7 +5396,7 @@ const S = {
   formRow: { display: "flex", gap: 12 },
   formActions: { display: "flex", gap: 10, justifyContent: "flex-start", marginTop: 20 },
 
-  primaryBtn: { background: "#16A699", color: "#fff", border: "none", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
+  primaryBtn: { background: "#16A699", color: "#fff", border: "none", borderRadius: 10, padding: "10px 20px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: FONT, boxShadow: "0 2px 10px rgba(22,166,153,0.28)" },
   secondaryBtn: { background: "#fff", color: "#6B7676", border: "1px solid #D8DCDC", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT, display: "inline-flex", alignItems: "center", gap: 6 },
   smallBtn: { background: "#EDEFEF", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
   dangerBtn: { background: "#FEE2E2", color: "#D32F2F", border: "1px solid #F0997B", borderRadius: 9, padding: "10px 20px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
@@ -5351,7 +5418,7 @@ const S = {
   settingHint: { fontSize: 13, color: "#6B7676", lineHeight: 1.6, marginBottom: 14 },
   dataRow: { display: "flex", gap: 18, marginBottom: 16, flexWrap: "wrap" },
   dataStat: { fontSize: 13.5, color: "#6B7676" },
-  toast: { position: "fixed", bottom: 24, right: 24, background: "#16A699", color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)" },
+  toast: { position: "fixed", bottom: 24, right: 24, background: "#16A699", color: "#fff", padding: "12px 20px", borderRadius: 10, fontSize: 14, boxShadow: "0 4px 20px rgba(0,0,0,0.15)", animation: "ugcpop .18s ease", zIndex: 210 },
 
   // empty
   empty: { textAlign: "center", padding: "50px 20px", color: "#9A9E9E", fontSize: 14, background: "#FFFFFF", border: "1px dashed #D8DCDC", borderRadius: 16 },
@@ -5426,18 +5493,18 @@ const S = {
   actionDot: { width: 20, height: 20, borderRadius: 99, background: "#16A699", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0, marginTop: 1 },
 
   // modal
-  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto" },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "40px 16px", zIndex: 100, overflowY: "auto", backdropFilter: "blur(2px)", WebkitBackdropFilter: "blur(2px)", animation: "ugcfade .15s ease" },
   modalCard: { background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, boxShadow: "0 20px 60px rgba(0,0,0,0.25)", padding: 24 },
   ghostBtn: { background: "transparent", color: "#6B7676", border: "1px solid #D8DCDC", borderRadius: 9, padding: "10px 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: FONT },
   miniBtn: { background: "#fff", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "5px 10px", fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
   waLink: { color: "#1FA958", textDecoration: "none", direction: "ltr", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 600 },
-  undoBar: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#16A699", color: "#fff", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 10px 30px rgba(15,45,30,0.35)", zIndex: 200, fontFamily: FONT, maxWidth: "90vw" },
+  undoBar: { position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)", background: "#16A699", color: "#fff", borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14, boxShadow: "0 10px 30px rgba(15,45,30,0.35)", zIndex: 200, fontFamily: FONT, maxWidth: "90vw", animation: "ugcpop .18s ease" },
   undoText: { fontSize: 14, fontWeight: 500 },
   undoBtn: { background: "#fff", color: "#16A699", border: "none", borderRadius: 8, padding: "7px 16px", fontSize: 13.5, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
   undoClose: { background: "transparent", color: "#D8DCDC", border: "none", cursor: "pointer", fontSize: 14, padding: "4px 6px" },
   trashKindPill: { fontSize: 11.5, fontWeight: 700, color: "#6B7676", background: "#EDEFEF", padding: "3px 10px", borderRadius: 99, border: "1px solid #D8DCDC", whiteSpace: "nowrap" },
   restoreBtn: { background: "#EDEFEF", color: "#16A699", border: "1px solid #D8DCDC", borderRadius: 8, padding: "7px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" },
-  modal: { background: "#fff", borderRadius: 16, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", display: "flex", flexDirection: "column" },
+  modal: { background: "#fff", borderRadius: 16, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.25)", maxHeight: "90vh", display: "flex", flexDirection: "column", animation: "ugcpop .18s ease" },
   modalHead: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px", borderBottom: "1px solid #D8DCDC" },
   modalTitle: { fontSize: 16, fontWeight: 700, color: "#1A1A1A" },
   modalClose: { width: 30, height: 30, borderRadius: 8, border: "1px solid #E0DED5", background: "#fff", cursor: "pointer", fontSize: 13, color: "#6B7676" },
@@ -5451,7 +5518,7 @@ const S = {
   lockSub: { fontSize: 11, color: "#6B7676", margin: "0 0 28px", lineHeight: 1.4, letterSpacing: 2, textTransform: "uppercase", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
   lockInput: { width: "100%", padding: "16px", border: "2px solid #E2E6E6", borderRadius: 12, fontSize: 22, textAlign: "center", letterSpacing: 10, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", boxSizing: "border-box", marginBottom: 16, outline: "none", transition: "border-color 0.2s", background: "#F9FBFB" },
   lockErr: { color: "#EF4444", fontSize: 13, marginBottom: 12, fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif" },
-  lockBtn: { width: "100%", background: "#16A699", color: "#FFFFFF", border: "none", borderRadius: 8, padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
+  lockBtn: { width: "100%", background: "#16A699", color: "#FFFFFF", border: "none", borderRadius: 10, boxShadow: "0 4px 14px rgba(22,166,153,0.35)", padding: "14px", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'Archivo', 'Helvetica Neue', Arial, sans-serif", textTransform: "uppercase", letterSpacing: "0.06em" },
 };
 
 
